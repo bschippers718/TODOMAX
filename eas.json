@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 3.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "image": "sdk-55"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "image": "sdk-55"
+      }
+    },
+    "production": {
+      "ios": {
+        "image": "sdk-55"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
