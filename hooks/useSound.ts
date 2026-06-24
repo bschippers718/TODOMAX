@@ -30,6 +30,8 @@ const ANIMATION_SOUNDS: Record<AnimationId, string> = {
   halftimeBand: 'celebrate',
   instantReplay: 'whoosh',
   interception: 'whoosh',
+  levelClear: 'fanfare',
+  pixelPowerUp: 'pop',
 };
 
 const VOLUME_MAP: Record<Settings['soundLevel'], number> = {

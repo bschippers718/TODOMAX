@@ -19,6 +19,10 @@ import { Task, COLORS, Settings } from '../lib/types';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.35;
 const CARD_HEIGHT = 58;
+const SCRIBBLE_WIDTH = SCREEN_WIDTH * 0.65;
+const SCRIBBLE_VARIANTS = ['doubleSlash', 'zigzag', 'markerLoop', 'pixelX'] as const;
+
+type ScribbleVariant = (typeof SCRIBBLE_VARIANTS)[number];
 
 interface TaskItemProps {
   task: Task;
@@ -33,9 +37,11 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
   const cardOpacity = useSharedValue(1);
   const cardMargin = useSharedValue(4);
   const isCompleting = useRef(false);
+  const scribbleVariant = useRef(getScribbleVariant(task.id)).current;
 
   const strike1Progress = useSharedValue(0);
   const strike2Progress = useSharedValue(0);
+  const strike3Progress = useSharedValue(0);
   const strikeGlow = useSharedValue(0);
   const shakeX = useSharedValue(0);
   const cardScale = useSharedValue(1);
@@ -68,8 +74,9 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
           runOnJS(fireHeavyHaptic)();
         }
 
-        // First slash
-        strike1Progress.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
+        strike1Progress.value = withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) });
+        strike2Progress.value = withDelay(90, withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) }));
+        strike3Progress.value = withDelay(170, withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }));
 
         // Shake
         shakeX.value = withSequence(
@@ -80,11 +87,7 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
           withTiming(0, { duration: 15 }),
         );
 
-        // Second slash
-        strike2Progress.value = withDelay(180, withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) }));
-
-        // Glow
-        strikeGlow.value = withDelay(180, withSequence(
+        strikeGlow.value = withDelay(130, withSequence(
           withTiming(1, { duration: 80 }),
           withTiming(0.3, { duration: 300 }),
         ));
@@ -135,15 +138,100 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
   }));
 
   const textAnimStyle = useAnimatedStyle(() => ({ opacity: textOpacity.value }));
-  const strike1Style = useAnimatedStyle(() => ({ width: strike1Progress.value * SCREEN_WIDTH * 0.65 }));
-  const strike2Style = useAnimatedStyle(() => ({ width: strike2Progress.value * SCREEN_WIDTH * 0.65 }));
+  const swipeProgressStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD * 0.25], [0, 1], Extrapolation.CLAMP),
+  }));
+  const strike1Style = useAnimatedStyle(() => ({
+    width: Math.max(
+      interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH], Extrapolation.CLAMP),
+      strike1Progress.value * SCRIBBLE_WIDTH,
+    ),
+  }));
+  const strike2Style = useAnimatedStyle(() => ({
+    width: Math.max(
+      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.18, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH], Extrapolation.CLAMP),
+      strike2Progress.value * SCRIBBLE_WIDTH,
+    ),
+  }));
+  const strike3Style = useAnimatedStyle(() => ({
+    width: Math.max(
+      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.38, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH * 0.9], Extrapolation.CLAMP),
+      strike3Progress.value * SCRIBBLE_WIDTH * 0.9,
+    ),
+  }));
+  const loopStyle = useAnimatedStyle(() => {
+    const progress = Math.max(
+      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.25, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+      strike2Progress.value,
+    );
+    return {
+      opacity: progress,
+      transform: [{ scaleX: progress }, { rotate: '-7deg' }],
+    };
+  });
+  const pixelXStyle = useAnimatedStyle(() => {
+    const progress = Math.max(
+      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.35, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+      strike3Progress.value,
+    );
+    return {
+      opacity: progress,
+      transform: [{ scale: progress }],
+    };
+  });
   const glowStyle = useAnimatedStyle(() => ({ opacity: strikeGlow.value }));
   const splatStyle = useAnimatedStyle(() => ({ opacity: splatOpacity.value }));
+
+  const renderScribble = () => {
+    if (scribbleVariant === 'zigzag') {
+      return (
+        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
+          <Animated.View style={[styles.zig, styles.zig1, strike1Style]} />
+          <Animated.View style={[styles.zig, styles.zig2, strike2Style]} />
+          <Animated.View style={[styles.zig, styles.zig3, strike3Style]} />
+        </Animated.View>
+      );
+    }
+
+    if (scribbleVariant === 'markerLoop') {
+      return (
+        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
+          <Animated.View style={[styles.loopStroke, loopStyle]} />
+          <Animated.View style={[styles.loopSlash, strike1Style]} />
+          <Animated.View style={[styles.loopSlashTwo, strike2Style]} />
+        </Animated.View>
+      );
+    }
+
+    if (scribbleVariant === 'pixelX') {
+      return (
+        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
+          <Animated.View style={[styles.pixelSlash, styles.pixelSlashA, strike1Style]} />
+          <Animated.View style={[styles.pixelSlash, styles.pixelSlashB, strike2Style]} />
+          <Animated.View style={[styles.pixelX, pixelXStyle]}>
+            <View style={[styles.pixelBlock, styles.pixelBlockA]} />
+            <View style={[styles.pixelBlock, styles.pixelBlockB]} />
+            <View style={[styles.pixelBlock, styles.pixelBlockC]} />
+            <View style={[styles.pixelBlock, styles.pixelBlockD]} />
+          </Animated.View>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
+        <Animated.View style={[styles.strike1, strike1Style]} />
+        <Animated.View style={[styles.strike2, strike2Style]} />
+        <Animated.View style={[styles.strike3, strike3Style]} />
+      </Animated.View>
+    );
+  };
 
   return (
     <Animated.View style={containerStyle}>
       <Animated.View style={[styles.bgReveal, bgStyle]}>
         <Text style={styles.completeIcon}>✓</Text>
+        <Text style={styles.completeLabel}>DONE!</Text>
       </Animated.View>
 
       <Animated.View style={shakeStyle}>
@@ -157,8 +245,7 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
               </Text>
             </Animated.View>
 
-            <Animated.View style={[styles.strike1, strike1Style]} />
-            <Animated.View style={[styles.strike2, strike2Style]} />
+            {renderScribble()}
 
             <Animated.View style={[styles.splat, styles.splat1, splatStyle]} />
             <Animated.View style={[styles.splat, styles.splat2, splatStyle]} />
@@ -180,62 +267,173 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
 
 const STRIKE_RED = '#FF3B30';
 
+function getScribbleVariant(id: string): ScribbleVariant {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  }
+  return SCRIBBLE_VARIANTS[Math.abs(hash) % SCRIBBLE_VARIANTS.length];
+}
+
 const styles = StyleSheet.create({
   bgReveal: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     paddingLeft: 20,
-    borderRadius: 12,
-    backgroundColor: COLORS.green,
+    borderRadius: 14,
+    backgroundColor: '#178C55',
   },
   completeIcon: {
-    fontSize: 20,
+    fontSize: 23,
     color: COLORS.white,
-    fontWeight: '700',
+    fontWeight: '900',
+  },
+  completeLabel: {
+    position: 'absolute',
+    right: 18,
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.2,
   },
   card: {
     height: CARD_HEIGHT,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 252, 244, 0.9)',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingHorizontal: 16,
+    borderColor: 'rgba(34, 31, 26, 0.12)',
+    paddingHorizontal: 18,
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowColor: '#564025',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.09,
+    shadowRadius: 12,
+    elevation: 2,
   },
   taskText: {
     color: COLORS.text,
     fontSize: 17,
+    fontWeight: '700',
     paddingRight: 32,
   },
   glowOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 59, 48, 0.08)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(229, 57, 45, 0.08)',
+    borderRadius: 14,
+  },
+  scribbleLayer: {
+    ...StyleSheet.absoluteFillObject,
+    pointerEvents: 'none',
   },
   strike1: {
     position: 'absolute',
     left: 12,
-    height: 3,
+    height: 4,
     backgroundColor: STRIKE_RED,
     borderRadius: 2,
-    top: '42%',
-    transform: [{ rotate: '6deg' }],
+    top: '38%',
+    transform: [{ rotate: '5deg' }],
   },
   strike2: {
     position: 'absolute',
-    left: 12,
+    left: 18,
+    height: 4,
+    backgroundColor: STRIKE_RED,
+    borderRadius: 2,
+    top: '54%',
+    transform: [{ rotate: '-7deg' }],
+  },
+  strike3: {
+    position: 'absolute',
+    left: 26,
     height: 3,
     backgroundColor: STRIKE_RED,
     borderRadius: 2,
-    top: '58%',
-    transform: [{ rotate: '-8deg' }],
+    top: '48%',
+    transform: [{ rotate: '1deg' }],
   },
+  zig: {
+    position: 'absolute',
+    height: 4,
+    backgroundColor: STRIKE_RED,
+    borderRadius: 1,
+  },
+  zig1: {
+    left: 12,
+    top: '32%',
+    transform: [{ rotate: '14deg' }],
+  },
+  zig2: {
+    left: 20,
+    top: '52%',
+    transform: [{ rotate: '-15deg' }],
+  },
+  zig3: {
+    left: 28,
+    top: '43%',
+    transform: [{ rotate: '11deg' }],
+  },
+  loopStroke: {
+    position: 'absolute',
+    left: 16,
+    top: 9,
+    width: SCRIBBLE_WIDTH * 0.74,
+    height: 40,
+    borderWidth: 4,
+    borderColor: STRIKE_RED,
+    borderRadius: 24,
+  },
+  loopSlash: {
+    position: 'absolute',
+    left: 18,
+    top: '45%',
+    height: 4,
+    backgroundColor: STRIKE_RED,
+    borderRadius: 2,
+    transform: [{ rotate: '-4deg' }],
+  },
+  loopSlashTwo: {
+    position: 'absolute',
+    left: 28,
+    top: '57%',
+    height: 3,
+    backgroundColor: STRIKE_RED,
+    borderRadius: 2,
+    transform: [{ rotate: '5deg' }],
+  },
+  pixelSlash: {
+    position: 'absolute',
+    left: 14,
+    height: 5,
+    backgroundColor: STRIKE_RED,
+    borderRadius: 0,
+  },
+  pixelSlashA: {
+    top: '38%',
+    transform: [{ rotate: '10deg' }],
+  },
+  pixelSlashB: {
+    top: '57%',
+    transform: [{ rotate: '-10deg' }],
+  },
+  pixelX: {
+    position: 'absolute',
+    right: 48,
+    top: 15,
+    width: 30,
+    height: 30,
+  },
+  pixelBlock: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    backgroundColor: STRIKE_RED,
+  },
+  pixelBlockA: { left: 0, top: 0 },
+  pixelBlockB: { right: 0, top: 0 },
+  pixelBlockC: { left: 0, bottom: 0 },
+  pixelBlockD: { right: 0, bottom: 0 },
   splat: {
     position: 'absolute',
     backgroundColor: STRIKE_RED,

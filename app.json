@@ -32,6 +32,12 @@
       "expo-router",
       "expo-font",
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ToDOMax to use a photo from your library as your task background."
+        }
+      ],
       "expo-audio",
       "expo-asset"
     ],

@@ -12,6 +12,8 @@ import { SingleConfetti } from './SingleConfetti';
 import { HalftimeBand } from './HalftimeBand';
 import { InstantReplay } from './InstantReplay';
 import { Interception } from './Interception';
+import { LevelClear } from './LevelClear';
+import { PixelPowerUp } from './PixelPowerUp';
 
 export const animationRegistry: Record<
   AnimationId,
@@ -29,4 +31,6 @@ export const animationRegistry: Record<
   halftimeBand: HalftimeBand,
   instantReplay: InstantReplay,
   interception: Interception,
+  levelClear: LevelClear,
+  pixelPowerUp: PixelPowerUp,
 };

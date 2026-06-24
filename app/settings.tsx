@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import { Alert, Image, View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSettings } from '../hooks/useSettings';
 import { COLORS, Settings } from '../lib/types';
@@ -46,6 +46,69 @@ function OptionRow({
 export default function SettingsScreen() {
   const { settings, updateSetting } = useSettings();
 
+  const pickBackground = async () => {
+    let ImagePicker: typeof import('expo-image-picker');
+    let FileSystem: typeof import('expo-file-system/legacy');
+
+    try {
+      [ImagePicker, FileSystem] = await Promise.all([
+        import('expo-image-picker'),
+        import('expo-file-system/legacy'),
+      ]);
+    } catch {
+      Alert.alert(
+        'Rebuild needed',
+        'The photo picker was added as a native module. Rebuild the iOS app once, then try choosing a background again.',
+      );
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        'Photo access needed',
+        'Allow photo library access to choose a custom ToDOMax background.',
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      try {
+        const sourceUri = result.assets[0].uri;
+        const rawExtension =
+          result.assets[0].fileName?.split('.').pop() ??
+          sourceUri.split('?')[0]?.split('.').pop();
+        const extension = rawExtension?.match(/^[a-zA-Z0-9]+$/)
+          ? rawExtension.toLowerCase()
+          : 'jpg';
+        if (!FileSystem.documentDirectory) {
+          throw new Error('Document directory unavailable');
+        }
+
+        const directory = `${FileSystem.documentDirectory}backgrounds/`;
+        const destination = `${directory}custom-background.${extension}`;
+
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+        await FileSystem.deleteAsync(destination, { idempotent: true });
+        await FileSystem.copyAsync({ from: sourceUri, to: destination });
+        updateSetting('customBackgroundUri', destination);
+      } catch {
+        Alert.alert(
+          'Background not saved',
+          'ToDOMax could not save that photo. Try choosing a different image.',
+        );
+      }
+    }
+  };
+
   return (
     <>
       <Stack.Screen
@@ -55,6 +118,46 @@ export default function SettingsScreen() {
         }}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Background</Text>
+          <View style={styles.sectionCard}>
+            <Text style={styles.backgroundText}>
+              Choose a photo from your camera roll. ToDOMax will soften it behind the paper surface so tasks stay readable.
+            </Text>
+            {settings.customBackgroundUri ? (
+              <Image
+                source={{ uri: settings.customBackgroundUri }}
+                style={styles.backgroundPreview}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.defaultPreview}>
+                <Text style={styles.defaultPreviewText}>Paper background</Text>
+              </View>
+            )}
+            <View style={styles.backgroundActions}>
+              <TouchableOpacity
+                style={[styles.backgroundButton, styles.backgroundButtonPrimary]}
+                onPress={pickBackground}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.backgroundButtonPrimaryText}>
+                  {settings.customBackgroundUri ? 'Change photo' : 'Choose photo'}
+                </Text>
+              </TouchableOpacity>
+              {settings.customBackgroundUri && (
+                <TouchableOpacity
+                  style={styles.backgroundButton}
+                  onPress={() => updateSetting('customBackgroundUri', null)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.backgroundButtonText}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Celebrations</Text>
           <View style={styles.sectionCard}>
@@ -142,6 +245,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     padding: 16,
+  },
+  backgroundText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  backgroundPreview: {
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    marginBottom: 12,
+  },
+  defaultPreview: {
+    height: 92,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: '#F7F1E4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  defaultPreviewText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  backgroundActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  backgroundButton: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    paddingVertical: 11,
+    backgroundColor: COLORS.bg,
+  },
+  backgroundButtonPrimary: {
+    backgroundColor: '#221F1A',
+    borderColor: '#221F1A',
+  },
+  backgroundButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  backgroundButtonPrimaryText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
   },
   optionRow: {
     marginBottom: 4,

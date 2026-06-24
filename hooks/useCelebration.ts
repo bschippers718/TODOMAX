@@ -21,7 +21,7 @@ export function useCelebration(settings: Settings) {
     (streak: number): AnimationId | null => {
       if (settings.animationMode === 'quiet') return null;
 
-      const animationId: AnimationId = 'touchdown'; // TEMP: force for testing
+      const animationId = draw();
 
       if (settings.hapticsEnabled) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

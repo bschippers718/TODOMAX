@@ -11,12 +11,14 @@ export interface Settings {
   soundLevel: 'silent' | 'subtle' | 'full';
   hapticsEnabled: boolean;
   animationMode: 'full' | 'minimal' | 'quiet';
+  customBackgroundUri: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   soundLevel: 'full',
   hapticsEnabled: true,
   animationMode: 'full',
+  customBackgroundUri: null,
 };
 
 export type AnimationId =
@@ -31,7 +33,9 @@ export type AnimationId =
   | 'singleConfetti'
   | 'halftimeBand'
   | 'instantReplay'
-  | 'interception';
+  | 'interception'
+  | 'levelClear'
+  | 'pixelPowerUp';
 
 export const ALL_ANIMATION_IDS: AnimationId[] = [
   'touchdown',
@@ -46,6 +50,8 @@ export const ALL_ANIMATION_IDS: AnimationId[] = [
   'halftimeBand',
   'instantReplay',
   'interception',
+  'levelClear',
+  'pixelPowerUp',
 ];
 
 export interface CelebrationAnimationProps {
