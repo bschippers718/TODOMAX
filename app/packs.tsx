@@ -20,7 +20,7 @@ import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { HeaderDone } from '../components/ui/HeaderDone';
 import { useToast } from '../components/ui/Toast';
-import { AnimationPack, PACKS } from '../lib/packs';
+import { AnimationPack, PACKS, packAccent } from '../lib/packs';
 import { ALL_ANIMATION_IDS, AnimationId } from '../lib/types';
 import { Theme, useTheme } from '../lib/theme';
 import { CollectionState } from '../lib/collection';
@@ -60,7 +60,7 @@ export default function PacksScreen() {
         title: `${pack.name} unlocked`,
         subtitle: 'Its celebrations are now in the rotation.',
         icon: 'sparkles',
-        tint: pack.accent,
+        tint: packAccent(pack, theme.isSignal),
       });
     }
   };
@@ -122,7 +122,7 @@ export default function PacksScreen() {
           />
         ))}
 
-        <PressableScale style={styles.restore} onPress={restore} pressedOpacity={0.6}>
+        <PressableScale style={styles.restore} onPress={restore} pressedOpacity={0.6} pressStyle="scale">
           <Text style={[styles.restoreText, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
             Restore Purchases
           </Text>
@@ -169,6 +169,9 @@ function PackCard({
 }) {
   const isFree = pack.price === null;
   const count = pack.animations.length;
+  const signal = theme.isSignal;
+  const accent = packAccent(pack, signal);
+  const pillRadius = { borderRadius: theme.radiusPill };
 
   return (
     <Pressable
@@ -176,23 +179,33 @@ function PackCard({
       delayLongPress={600}
       style={[
         styles.card,
-        { backgroundColor: theme.surface, borderColor: hero ? pack.accent : theme.border, shadowColor: theme.shadow },
-        hero && styles.cardHero,
+        signal ? theme.shadowCard : null,
+        {
+          backgroundColor: theme.surface,
+          borderColor: signal ? theme.cardBorder : hero ? accent : theme.border,
+          borderWidth: signal ? theme.borderWidth : hero ? 2 : StyleSheet.hairlineWidth,
+          borderRadius: theme.radiusCard,
+          shadowColor: theme.shadow,
+        },
+        !signal && hero && styles.cardHero,
+        signal && styles.cardSignal,
       ]}
     >
+      {/* Signal: the pack's line colour runs along the top edge, like a route strip. */}
+      {signal && <View style={[styles.lineStrip, { backgroundColor: accent }]} />}
       <View style={styles.cardHead}>
-        <View style={[styles.glyphBox, { backgroundColor: pack.accent }]}>
+        <View style={[styles.glyphBox, { backgroundColor: accent, borderRadius: signal ? 24 : 11 }]}>
           <Text style={styles.glyph} allowFontScaling={false}>
             {pack.glyph}
           </Text>
         </View>
         <View style={styles.cardTitleWrap}>
           <View style={styles.cardTitleRow}>
-            <Text style={[styles.cardTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+            <Text style={[styles.cardTitle, signal && theme.fontDisplay, signal && styles.cardTitleSignal, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
               {pack.name}
             </Text>
             {hero && (
-              <Text style={[styles.heroTag, { backgroundColor: pack.accent }]} allowFontScaling={false}>
+              <Text style={[styles.heroTag, { backgroundColor: accent, borderRadius: theme.radiusTag }]} allowFontScaling={false}>
                 SIGNATURE
               </Text>
             )}
@@ -211,19 +224,20 @@ function PackCard({
         {pack.animations.map((id) => (
           <PressableScale
             key={id}
-            style={[styles.chip, { borderColor: pack.accent, backgroundColor: theme.surfaceSoft }]}
+            style={[styles.chip, pillRadius, { borderColor: signal ? theme.cardBorder : accent, borderWidth: signal ? 2 : 1, backgroundColor: theme.surfaceSoft }]}
             onPress={() => onPreview(id)}
             pressedScale={0.94}
+            pressStyle="scale"
             accessibilityLabel={`Preview ${pack.animationNames[id] ?? id}`}
           >
-            <Symbol name={earned[id] ? 'checkmark.circle.fill' : 'play.fill'} size={earned[id] ? 12 : 9} color={pack.accent} />
+            <Symbol name={earned[id] ? 'checkmark.circle.fill' : 'play.fill'} size={earned[id] ? 12 : 9} color={earned[id] && signal ? theme.green : accent} />
             <Text style={[styles.chipText, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
               {pack.animationNames[id] ?? id}
             </Text>
           </PressableScale>
         ))}
         {pack.comingSoon ? (
-          <View style={[styles.chip, styles.chipGhost, { borderColor: theme.borderStrong }]}>
+          <View style={[styles.chip, styles.chipGhost, pillRadius, { borderColor: signal ? theme.textTertiary : theme.borderStrong }]}>
             <Text style={[styles.chipGhostText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
               +{pack.comingSoon} coming
             </Text>
@@ -236,13 +250,13 @@ function PackCard({
           {count} celebration{count === 1 ? '' : 's'}
         </Text>
         {isFree ? (
-          <View style={[styles.pill, { backgroundColor: theme.goldSoft }]}>
-            <Text style={[styles.pillText, { color: theme.gold }]} allowFontScaling={false}>
+          <View style={[styles.pill, pillRadius, { backgroundColor: theme.goldSoft, borderWidth: signal ? 2 : 0, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.pillText, { color: theme.onGold }]} allowFontScaling={false}>
               INCLUDED
             </Text>
           </View>
         ) : owned ? (
-          <View style={[styles.pill, styles.pillOwned, { borderColor: theme.green }]}>
+          <View style={[styles.pill, styles.pillOwned, pillRadius, { borderColor: theme.green, borderWidth: signal ? 2 : 1 }]}>
             <Symbol name="checkmark.circle.fill" size={13} color={theme.green} />
             <Text style={[styles.pillText, { color: theme.green }]} allowFontScaling={false}>
               UNLOCKED
@@ -250,8 +264,15 @@ function PackCard({
           </View>
         ) : (
           // App Store–style price capsule: blue, pill-shaped, price only.
+          // Signal: an Express Blue sign with an ink border and hard shadow.
           <PressableScale
-            style={[styles.buy, { backgroundColor: theme.blue }]}
+            style={[
+              styles.buy,
+              pillRadius,
+              signal && theme.shadowControl,
+              { backgroundColor: theme.blue, borderWidth: signal ? 2 : 0, borderColor: theme.cardBorder },
+              signal && styles.buySignal,
+            ]}
             onPress={onBuy}
             disabled={pending}
             pressedScale={0.94}
@@ -294,17 +315,35 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   card: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     marginBottom: 14,
+    overflow: 'visible',
   },
   cardHero: {
-    borderWidth: 2,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 18,
     elevation: 3,
+  },
+  cardSignal: {
+    marginRight: 4,
+    marginBottom: 18,
+    paddingTop: 22,
+  },
+  lineStrip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 8,
+  },
+  cardTitleSignal: {
+    fontSize: 20,
+    letterSpacing: -0.5,
+  },
+  buySignal: {
+    marginRight: 3,
+    marginBottom: 3,
   },
   cardHead: {
     flexDirection: 'row',

@@ -341,6 +341,59 @@ footer {
   opacity: 0.6;
 }
 
+/* Print / PDF */
+@page {
+  size: letter;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: var(--sg-paper, #fff) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    padding: 14mm 12mm;
+    zoom: 0.78;
+  }
+  .topbar {
+    display: none;
+  }
+  section {
+    padding: 36px 0;
+  }
+  .wrap {
+    max-width: none;
+    padding: 0;
+  }
+  h2,
+  h3,
+  .eyebrow {
+    break-after: avoid;
+  }
+  .card,
+  .swatch,
+  .comp,
+  .dir,
+  .specimen,
+  .phones > div,
+  .share,
+  .reco,
+  table.tokens tr,
+  table.cmp tr {
+    break-inside: avoid;
+  }
+  .dir:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  a {
+    text-decoration: none;
+  }
+}
+
 @media (max-width: 720px) {
   .specimen {
     grid-template-columns: 1fr;

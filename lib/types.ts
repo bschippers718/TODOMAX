@@ -12,6 +12,8 @@ export interface Settings {
   hapticsEnabled: boolean;
   animationMode: 'full' | 'minimal' | 'quiet';
   customBackgroundUri: string | null;
+  /** Visual direction — see lib/theme.ts. */
+  style: 'classic' | 'signal';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hapticsEnabled: true,
   animationMode: 'full',
   customBackgroundUri: null,
+  style: 'signal',
 };
 
 export type AnimationId =

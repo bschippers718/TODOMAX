@@ -6,6 +6,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useTheme } from '../../lib/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -15,6 +16,14 @@ interface Props extends Omit<PressableProps, 'style'> {
   pressedScale?: number;
   /** Opacity while pressed. */
   pressedOpacity?: number;
+  /**
+   * `scale` squashes (Classic). `drop` slides the control onto its hard shadow
+   * and flattens the shadow (Signal). Defaults to the theme's preference; pass
+   * `pressStyle="scale"` for text-only buttons that have no shadow to drop onto.
+   */
+  pressStyle?: 'scale' | 'drop' | 'auto';
+  /** How far a `drop` press travels. Should match the hard-shadow offset. */
+  dropDistance?: number;
   children?: React.ReactNode;
 }
 
@@ -26,33 +35,49 @@ export function PressableScale({
   style,
   pressedScale = 0.97,
   pressedOpacity = 0.85,
+  pressStyle = 'auto',
+  dropDistance = 3,
   onPressIn,
   onPressOut,
   disabled,
   children,
   ...rest
 }: Props) {
+  const theme = useTheme();
   const pressed = useSharedValue(0);
+  const mode = pressStyle === 'auto' ? theme.pressStyle : pressStyle;
 
   const handleIn = useCallback(
     (e: any) => {
-      pressed.value = withTiming(1, { duration: 90 });
+      pressed.value = withTiming(1, { duration: mode === 'drop' ? 70 : 90 });
       onPressIn?.(e);
     },
-    [onPressIn, pressed]
+    [onPressIn, pressed, mode]
   );
   const handleOut = useCallback(
     (e: any) => {
-      pressed.value = withSpring(0, { damping: 16, stiffness: 320, mass: 0.6 });
+      pressed.value =
+        mode === 'drop'
+          ? withTiming(0, { duration: 90 })
+          : withSpring(0, { damping: 16, stiffness: 320, mass: 0.6 });
       onPressOut?.(e);
     },
-    [onPressOut, pressed]
+    [onPressOut, pressed, mode]
   );
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - (1 - pressedScale) * pressed.value }],
-    opacity: 1 - (1 - pressedOpacity) * pressed.value,
-  }));
+  const animStyle = useAnimatedStyle(() => {
+    if (mode === 'drop') {
+      const d = dropDistance * pressed.value;
+      return {
+        transform: [{ translateX: d }, { translateY: d }],
+        shadowOffset: { width: dropDistance - d, height: dropDistance - d },
+      };
+    }
+    return {
+      transform: [{ scale: 1 - (1 - pressedScale) * pressed.value }],
+      opacity: 1 - (1 - pressedOpacity) * pressed.value,
+    };
+  });
 
   return (
     <AnimatedPressable

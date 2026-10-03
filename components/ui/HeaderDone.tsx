@@ -12,11 +12,12 @@ export function HeaderDone({ label = 'Done' }: { label?: string }) {
       onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       pressedScale={0.94}
       pressedOpacity={0.6}
+      pressStyle="scale"
       hitSlop={10}
       accessibilityLabel={label}
       style={styles.button}
     >
-      <Text style={[styles.text, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
+      <Text style={[styles.text, theme.isSignal && theme.fontTask, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
         {label}
       </Text>
     </PressableScale>

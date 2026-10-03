@@ -33,6 +33,9 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
     setText('');
   };
 
+  const signal = theme.isSignal;
+  const radius = { borderRadius: theme.radiusControl };
+
   return (
     // Bottom padding is the real safe-area inset; the screen's keyboard-controller
     // KeyboardAvoidingView subtracts it again so the bar lands flush on the keyboard.
@@ -42,24 +45,33 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
           {
             paddingBottom: Math.max(insets.bottom, 12),
             backgroundColor: theme.composerBg,
-            borderTopColor: theme.separator,
+            borderTopColor: signal ? theme.cardBorder : theme.separator,
+            borderTopWidth: signal ? 2 : StyleSheet.hairlineWidth,
           },
         ]}
       >
         <View
           style={[
             styles.inputShell,
-            { backgroundColor: theme.inputBg, borderColor: theme.borderStrong, shadowColor: theme.shadow },
-            hasText && { borderColor: theme.accent, shadowColor: theme.accent, shadowOpacity: 0.12 },
+            radius,
+            theme.shadowControl,
+            { backgroundColor: theme.inputBg, borderColor: theme.cardBorder, borderWidth: theme.borderWidth },
+            !signal && hasText && { borderColor: theme.accent, shadowColor: theme.accent, shadowOpacity: 0.12 },
+            signal && styles.shellSignal,
           ]}
         >
-          <Symbol name="sparkles" size={16} color={theme.gold} style={styles.promptPip} />
+          {signal ? (
+            // Signal: a stop marker where the next stop goes.
+            <View style={[styles.stopPip, { borderColor: hasText ? theme.blue : theme.textTertiary }]} />
+          ) : (
+            <Symbol name="sparkles" size={16} color={theme.gold} style={styles.promptPip} />
+          )}
           <TextInput
             ref={inputRef}
-            style={[styles.input, { color: theme.text }]}
+            style={[styles.input, theme.fontTask, { color: theme.text }]}
             value={text}
             onChangeText={setText}
-            placeholder="Add one thing…"
+            placeholder={signal ? 'Add one stop…' : 'Add one thing…'}
             placeholderTextColor={theme.textTertiary}
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
@@ -75,9 +87,14 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
         <PressableScale
           style={[
             styles.addButton,
+            radius,
+            { borderWidth: theme.borderWidth },
             hasText
-              ? { backgroundColor: theme.buttonFill, borderColor: theme.gold, shadowColor: theme.shadow }
-              : { backgroundColor: DISABLED_FILL, borderColor: 'transparent', shadowOpacity: 0 },
+              ? [theme.shadowControl, { backgroundColor: theme.buttonFill, borderColor: signal ? theme.cardBorder : theme.gold }]
+              : signal
+                ? { backgroundColor: theme.bg, borderColor: theme.textTertiary, ...theme.shadowNone }
+                : { backgroundColor: DISABLED_FILL, borderColor: 'transparent', ...theme.shadowNone },
+            signal && styles.addSignal,
           ]}
           onPress={handleSubmit}
           disabled={!hasText}
@@ -89,7 +106,7 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
             name="plus"
             size={20}
             weight="bold"
-            color={hasText ? theme.buttonText : (DISABLED_INK as unknown as string)}
+            color={hasText ? theme.buttonText : signal ? theme.textTertiary : (DISABLED_INK as unknown as string)}
           />
         </PressableScale>
       </View>
@@ -107,19 +124,27 @@ const styles = StyleSheet.create({
   inputShell: {
     flex: 1,
     minHeight: 52,
-    borderRadius: 14,
-    borderWidth: 1,
     paddingLeft: 14,
     paddingRight: 8,
     marginRight: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+  },
+  // Leave room for the 3px hard shadow.
+  shellSignal: {
+    marginRight: 13,
+    marginBottom: 3,
+    minHeight: 50,
   },
   promptPip: {
     marginRight: 8,
+  },
+  stopPip: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2.5,
+    marginRight: 10,
   },
   input: {
     flex: 1,
@@ -130,12 +155,13 @@ const styles = StyleSheet.create({
   addButton: {
     width: 52,
     height: 52,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
+  },
+  addSignal: {
+    width: 50,
+    height: 50,
+    marginRight: 3,
+    marginBottom: 3,
   },
 });

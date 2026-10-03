@@ -12,6 +12,7 @@ import { Symbol } from '../components/ui/Symbol';
 import { HeaderDone } from '../components/ui/HeaderDone';
 import { AnimationId, ALL_ANIMATION_IDS } from '../lib/types';
 import { Theme, useTheme } from '../lib/theme';
+import { packAccent } from '../lib/packs';
 import {
   ANIMATION_META,
   BoardSection,
@@ -80,7 +81,7 @@ export default function CollectionScreen() {
                   id={id}
                   size={tileSize}
                   theme={theme}
-                  accent={section.pack.accent}
+                  accent={packAccent(section.pack, theme.isSignal)}
                   status={getTileStatus(id, collection, unlockedSet.has(id))}
                   count={collection.earned[id]?.count ?? 0}
                   isNew={(collection.earned[id]?.firstAt ?? 0) > collection.lastViewedAt}
@@ -119,15 +120,29 @@ function SummaryCard({
   unlocked: Set<AnimationId>;
 }) {
   const pct = Math.round((stats.earned / stats.total) * 100);
+  const signal = theme.isSignal;
   return (
-    <View style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border, shadowColor: theme.shadow }]}>
+    <View
+      style={[
+        styles.summary,
+        signal ? theme.shadowCard : styles.summarySoft,
+        {
+          backgroundColor: theme.surface,
+          borderColor: signal ? theme.cardBorder : theme.border,
+          borderWidth: signal ? theme.borderWidth : StyleSheet.hairlineWidth,
+          borderRadius: theme.radiusCard,
+          shadowColor: theme.shadow,
+        },
+        signal && styles.summarySignal,
+      ]}
+    >
       <View style={styles.summaryTop}>
         <View>
-          <Text style={[styles.eyebrow, { color: theme.gold }]} allowFontScaling={false}>
+          <Text style={[styles.eyebrow, { color: signal ? theme.textTertiary : theme.gold }]} allowFontScaling={false}>
             EARNED
           </Text>
           <View style={styles.bigRow}>
-            <Text style={[styles.bigNumber, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
+            <Text style={[styles.bigNumber, signal && theme.fontDisplay, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
               {stats.earned}
             </Text>
             <Text style={[styles.bigDenom, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
@@ -135,8 +150,8 @@ function SummaryCard({
             </Text>
           </View>
         </View>
-        <View style={[styles.pctBadge, { backgroundColor: theme.goldSoft }]}>
-          <Text style={[styles.pctText, { color: theme.gold }]} allowFontScaling={false}>
+        <View style={[styles.pctBadge, { backgroundColor: theme.goldSoft, borderRadius: theme.radiusTag, borderWidth: signal ? 2 : 0, borderColor: theme.cardBorder }]}>
+          <Text style={[styles.pctText, { color: theme.onGold }]} allowFontScaling={false}>
             {pct}%
           </Text>
         </View>
@@ -158,9 +173,10 @@ function SummaryCard({
                       : status === 'previewed'
                         ? theme.gold
                         : status === 'hidden'
-                          ? theme.borderStrong
+                          ? signal ? theme.grey : theme.borderStrong
                           : 'transparent',
-                  borderColor: status === 'locked' ? theme.borderStrong : 'transparent',
+                  borderColor: status === 'locked' ? (signal ? theme.text : theme.borderStrong) : 'transparent',
+                  borderRadius: theme.radiusTag,
                 },
               ]}
             />
@@ -171,8 +187,8 @@ function SummaryCard({
       <View style={styles.legend}>
         <Legend theme={theme} color={theme.green} label={`${stats.earned} earned`} />
         <Legend theme={theme} color={theme.gold} label={`${stats.previewed} previewed`} />
-        <Legend theme={theme} color={theme.borderStrong} label={`${stats.total - stats.earned - stats.previewed - stats.locked} unseen`} />
-        <Legend theme={theme} color="transparent" border={theme.borderStrong} label={`${stats.locked} locked`} />
+        <Legend theme={theme} color={signal ? theme.grey : theme.borderStrong} label={`${stats.total - stats.earned - stats.previewed - stats.locked} unseen`} />
+        <Legend theme={theme} color="transparent" border={signal ? theme.text : theme.borderStrong} label={`${stats.locked} locked`} />
       </View>
     </View>
   );
@@ -193,7 +209,7 @@ function SectionHeader({ theme, section, onUnlock }: { theme: Theme; section: Bo
   const { pack, unlocked, earnedInPack } = section;
   return (
     <View style={styles.sectionHead}>
-      <View style={[styles.glyphBox, { backgroundColor: unlocked ? pack.accent : theme.borderStrong }]}>
+      <View style={[styles.glyphBox, { backgroundColor: unlocked ? packAccent(pack, theme.isSignal) : theme.borderStrong, borderRadius: theme.isSignal ? 18 : 9 }]}>
         <Text style={styles.glyph} allowFontScaling={false}>
           {pack.glyph}
         </Text>
@@ -210,7 +226,12 @@ function SectionHeader({ theme, section, onUnlock }: { theme: Theme; section: Bo
       </View>
       {!unlocked && (
         <PressableScale
-          style={[styles.unlockLink, { backgroundColor: theme.blue }]}
+          style={[
+            styles.unlockLink,
+            theme.isSignal && theme.shadowControl,
+            { backgroundColor: theme.blue, borderRadius: theme.radiusPill, borderWidth: theme.isSignal ? 2 : 0, borderColor: theme.cardBorder },
+            theme.isSignal && styles.unlockSignal,
+          ]}
           onPress={onUnlock}
           pressedScale={0.94}
           accessibilityLabel={`Unlock ${pack.name}`}
@@ -247,8 +268,10 @@ function Tile({
   const name = getAnimationName(id);
   const revealed = status === 'earned' || status === 'previewed' || status === 'locked';
 
-  const borderColor =
-    status === 'earned' ? accent : status === 'locked' ? theme.border : theme.borderStrong;
+  const signal = theme.isSignal;
+  const borderColor = signal
+    ? status === 'earned' ? theme.cardBorder : status === 'locked' ? theme.border : theme.textTertiary
+    : status === 'earned' ? accent : status === 'locked' ? theme.border : theme.borderStrong;
   const iconColor =
     status === 'earned' ? accent : status === 'locked' ? theme.textTertiary : theme.textTertiary;
   const caption =
@@ -266,20 +289,23 @@ function Tile({
     <PressableScale
       style={[
         styles.tile,
+        signal && status === 'earned' ? theme.shadowControl : styles.tileSoft,
         {
-          width: size,
+          width: signal ? size - 3 : size,
           height: size * 1.12,
-          backgroundColor: status === 'earned' ? theme.surface : theme.surfaceSoft,
+          borderRadius: theme.radiusCard,
+          backgroundColor: status === 'earned' ? theme.surface : signal ? 'transparent' : theme.surfaceSoft,
           borderColor,
-          borderWidth: status === 'earned' ? 2 : status === 'locked' ? 1 : 1.5,
+          borderWidth: status === 'earned' ? (signal ? 2.5 : 2) : status === 'locked' ? 1 : (signal ? 2 : 1.5),
           borderStyle: status === 'hidden' || status === 'previewed' ? 'dashed' : 'solid',
           shadowColor: theme.shadow,
-          shadowOpacity: status === 'earned' ? 0.1 : 0,
+          shadowOpacity: signal ? (status === 'earned' ? 1 : 0) : status === 'earned' ? 0.1 : 0,
           opacity: status === 'locked' ? 0.6 : 1,
         },
       ]}
       onPress={onPress}
       pressedScale={0.95}
+      pressStyle={signal && status === 'earned' ? 'drop' : 'scale'}
       accessibilityLabel={`${revealed ? name : 'Unknown celebration'}, ${caption.toLowerCase()}`}
       accessibilityHint="Previews the celebration"
     >
@@ -305,8 +331,8 @@ function Tile({
         {caption}
       </Text>
       {isNew && status === 'earned' && (
-        <View style={[styles.newTag, { backgroundColor: theme.accent }]}>
-          <Text style={styles.newTagText} allowFontScaling={false}>
+        <View style={[styles.newTag, { backgroundColor: signal ? theme.gold : theme.accent, borderRadius: theme.radiusTag, borderWidth: signal ? 2 : 0, borderColor: theme.cardBorder }]}>
+          <Text style={[styles.newTagText, { color: signal ? theme.onGold : '#fff' }]} allowFontScaling={false}>
             NEW
           </Text>
         </View>
@@ -319,13 +345,24 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 48 },
   summary: {
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
     padding: 18,
     marginBottom: 26,
+  },
+  summarySoft: {
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
+  },
+  summarySignal: {
+    marginRight: 4,
+  },
+  unlockSignal: {
+    marginRight: 3,
+    marginBottom: 3,
+  },
+  tileSoft: {
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
   },
   summaryTop: {
     flexDirection: 'row',
@@ -341,7 +378,7 @@ const styles = StyleSheet.create({
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   bigNumber: { fontSize: 44, fontWeight: '800', letterSpacing: -1.5, lineHeight: 48 },
   bigDenom: { fontSize: 20, fontWeight: '600' },
-  pctBadge: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
+  pctBadge: { paddingHorizontal: 10, paddingVertical: 7 },
   pctText: { fontFamily: PIXEL_FONT, fontSize: 10 },
   blocks: {
     flexDirection: 'row',
@@ -384,7 +421,6 @@ const styles = StyleSheet.create({
   unlockLink: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 999,
   },
   unlockLinkText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   grid: {
@@ -393,12 +429,9 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   tile: {
-    borderRadius: 14,
     padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
     overflow: 'visible',
   },
   tileIcon: {

@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
+import { Archivo_700Bold, Archivo_900Black } from '@expo-google-fonts/archivo';
 import * as SplashScreen from 'expo-splash-screen';
 import { useTheme } from '../lib/theme';
 
@@ -14,6 +15,9 @@ export default function RootLayout() {
   const theme = useTheme();
   const [fontsLoaded] = useFonts({
     PressStart2P: PressStart2P_400Regular,
+    // Signal's display face — Helvetica's loud cousin, without the licence.
+    Archivo_700Bold,
+    Archivo_900Black,
   });
 
   useEffect(() => {
@@ -43,7 +47,9 @@ export default function RootLayout() {
           screenOptions={{
             headerStyle: { backgroundColor: theme.bg },
             headerTintColor: theme.blue,
-            headerTitleStyle: { fontSize: 17, fontWeight: '600', color: theme.text },
+            headerTitleStyle: theme.isSignal
+              ? { fontSize: 17, fontFamily: 'Archivo_900Black', color: theme.text }
+              : { fontSize: 17, fontWeight: '600', color: theme.text },
             contentStyle: { backgroundColor: theme.bg },
             animation: 'default',
             headerShadowVisible: false,

@@ -119,8 +119,20 @@ export default function SettingsScreen() {
     }
   };
 
-  const card = [styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }];
-  const sectionTitle = [styles.sectionTitle, { color: theme.textSecondary }];
+  const signal = theme.isSignal;
+  const card = [
+    styles.sectionCard,
+    signal && theme.shadowControl,
+    {
+      backgroundColor: theme.surface,
+      borderColor: signal ? theme.cardBorder : theme.border,
+      borderWidth: signal ? theme.borderWidth : StyleSheet.hairlineWidth,
+      borderRadius: theme.radiusCard,
+    },
+    signal && styles.sectionCardSignal,
+  ];
+  const sectionTitle = [styles.sectionTitle, signal && theme.fontLabel, signal && styles.sectionTitleSignal, { color: theme.textSecondary }];
+  const controlRadius = { borderRadius: theme.radiusControl };
 
   return (
     <>
@@ -137,31 +149,61 @@ export default function SettingsScreen() {
         alwaysBounceVertical
       >
         <View style={styles.section}>
+          <Text style={sectionTitle}>Style</Text>
+          <View style={card}>
+            <OptionRow
+              label="Look"
+              value={settings.style}
+              onChange={(val) => updateSetting('style', val)}
+              theme={theme}
+              haptics={settings.hapticsEnabled}
+              options={[
+                { key: 'signal', label: 'Signal' },
+                { key: 'classic', label: 'Classic' },
+              ]}
+            />
+            <Text style={[styles.styleHint, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+              {signal
+                ? 'Signal: subway signage. Paper, ink, one yellow, and a Daily Route strip that shows your day as coloured stops.'
+                : 'Classic: warm paper over pixel Manhattan, soft cards and gold accents.'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={sectionTitle}>Background</Text>
           <View style={card}>
             <Text style={[styles.backgroundText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-              Choose a photo from your camera roll. ToDOMax will soften it behind the paper surface so tasks stay readable.
+              {signal
+                ? 'Signal runs on plain paper by default. You can still put a photo behind it; it will be washed back so the signs stay legible.'
+                : 'Choose a photo from your camera roll. ToDOMax will soften it behind the paper surface so tasks stay readable.'}
             </Text>
             {settings.customBackgroundUri ? (
               <Image
                 source={{ uri: settings.customBackgroundUri }}
-                style={[styles.backgroundPreview, { borderColor: theme.border }]}
+                style={[styles.backgroundPreview, { borderColor: signal ? theme.cardBorder : theme.border, borderWidth: signal ? 2 : StyleSheet.hairlineWidth, borderRadius: theme.radiusCard }]}
                 resizeMode="cover"
               />
             ) : (
-              <View style={[styles.defaultPreview, { borderColor: theme.border }]}>
-                <Image source={theme.mapAsset} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                <View style={[styles.defaultPreviewLabel, { backgroundColor: theme.surface }]}>
-                  <Symbol name="map.fill" size={13} color={theme.textSecondary} />
+              <View style={[styles.defaultPreview, { borderColor: signal ? theme.cardBorder : theme.border, borderWidth: signal ? 2 : StyleSheet.hairlineWidth, borderRadius: theme.radiusCard, backgroundColor: theme.bg }]}>
+                {theme.showMap && <Image source={theme.mapAsset} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+                <View style={[styles.defaultPreviewLabel, { backgroundColor: theme.surface, borderRadius: theme.radiusPill, borderWidth: signal ? 2 : 0, borderColor: theme.cardBorder }]}>
+                  <Symbol name={theme.showMap ? 'map.fill' : 'doc.plaintext'} size={13} color={theme.textSecondary} />
                   <Text style={[styles.defaultPreviewText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                    Pixel Manhattan
+                    {theme.showMap ? 'Pixel Manhattan' : 'Paper'}
                   </Text>
                 </View>
               </View>
             )}
             <View style={styles.backgroundActions}>
               <PressableScale
-                style={[styles.backgroundButton, { backgroundColor: theme.buttonFill, borderColor: theme.buttonFill }]}
+                style={[
+                  styles.backgroundButton,
+                  controlRadius,
+                  signal && theme.shadowControl,
+                  { backgroundColor: theme.buttonFill, borderColor: signal ? theme.cardBorder : theme.buttonFill, borderWidth: signal ? theme.borderWidth : 1 },
+                  signal && styles.buttonSignal,
+                ]}
                 onPress={pickBackground}
               >
                 <Text style={[styles.backgroundButtonPrimaryText, { color: theme.buttonText }]} maxFontSizeMultiplier={1.3}>
@@ -170,7 +212,13 @@ export default function SettingsScreen() {
               </PressableScale>
               {settings.customBackgroundUri && (
                 <PressableScale
-                  style={[styles.backgroundButton, { borderColor: theme.borderStrong }]}
+                  style={[
+                    styles.backgroundButton,
+                    controlRadius,
+                    signal && theme.shadowControl,
+                    { borderColor: signal ? theme.cardBorder : theme.borderStrong, borderWidth: signal ? theme.borderWidth : 1, backgroundColor: signal ? theme.surface : 'transparent' },
+                    signal && styles.buttonSignal,
+                  ]}
                   onPress={() => updateSetting('customBackgroundUri', null)}
                 >
                   <Text style={[styles.backgroundButtonText, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
@@ -189,6 +237,7 @@ export default function SettingsScreen() {
               style={styles.linkRow}
               onPress={() => router.push('/collection')}
               pressedScale={0.985}
+              pressStyle="scale"
               accessibilityRole="link"
             >
               <View style={styles.linkTextWrap}>
@@ -207,6 +256,7 @@ export default function SettingsScreen() {
               style={styles.linkRow}
               onPress={() => router.push('/packs')}
               pressedScale={0.985}
+              pressStyle="scale"
               accessibilityRole="link"
             >
               <View style={styles.linkTextWrap}>
@@ -269,7 +319,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: theme.surfaceSoft }]}>
+        <View style={[styles.infoCard, { backgroundColor: signal ? 'transparent' : theme.surfaceSoft, borderRadius: theme.radiusCard }]}>
           <Text style={[styles.infoText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
             Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal.
           </Text>
@@ -303,9 +353,24 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   sectionCard: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
+  },
+  sectionCardSignal: {
+    marginRight: 3,
+  },
+  sectionTitleSignal: {
+    fontSize: 7,
+    letterSpacing: 0,
+    marginBottom: 10,
+  },
+  styleHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 10,
+  },
+  buttonSignal: {
+    marginRight: 3,
+    marginBottom: 3,
   },
   backgroundText: {
     fontSize: 14,
@@ -314,14 +379,10 @@ const styles = StyleSheet.create({
   },
   backgroundPreview: {
     height: 140,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
   },
   defaultPreview: {
     height: 110,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -333,7 +394,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 999,
   },
   defaultPreviewText: {
     fontSize: 13,
@@ -346,8 +406,6 @@ const styles = StyleSheet.create({
   backgroundButton: {
     flex: 1,
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
     paddingVertical: 12,
   },
   backgroundButtonText: {
@@ -399,7 +457,6 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     padding: 16,
-    borderRadius: 14,
     marginBottom: 28,
   },
   infoText: {

@@ -74,16 +74,19 @@ function Toast({ message }: { message: ToastMessage }) {
       <Animated.View
         style={[
           styles.pill,
+          theme.isSignal ? theme.shadowControl : styles.pillSoft,
           {
             backgroundColor: theme.surface,
-            borderColor: theme.borderStrong,
+            borderColor: theme.isSignal ? theme.cardBorder : theme.borderStrong,
+            borderWidth: theme.isSignal ? theme.borderWidth : StyleSheet.hairlineWidth,
+            borderRadius: theme.isSignal ? theme.radiusControl : 999,
             shadowColor: theme.shadow,
           },
           style,
         ]}
         accessibilityLiveRegion="polite"
       >
-        <View style={[styles.iconWrap, { backgroundColor: tint }]}>
+        <View style={[styles.iconWrap, { backgroundColor: tint, borderRadius: theme.isSignal ? 13 : 13 }]}>
           <Symbol name={message.icon ?? 'checkmark'} size={14} color="#fff" weight="bold" />
         </View>
         <View style={styles.textCol}>
@@ -119,18 +122,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingLeft: 10,
     paddingRight: 18,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    maxWidth: '88%',
+  },
+  pillSoft: {
     shadowOpacity: 0.18,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
-    maxWidth: '88%',
   },
   iconWrap: {
     width: 26,
     height: 26,
-    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -54,6 +54,8 @@ type ScribbleVariant = (typeof SCRIBBLE_VARIANTS)[number];
 interface TaskItemProps {
   task: Task;
   settings: Settings;
+  /** Position in the list; Signal shows it as a stop number. */
+  index?: number;
   reduceMotion?: boolean;
   /** Fired the instant the scribble lands (sound/haptics belong here). */
   onStrike?: (id: string) => void;
@@ -96,6 +98,7 @@ const ANGLES: Record<ScribbleVariant, [number, number, number]> = {
 function TaskItemInner({
   task,
   settings,
+  index = 0,
   reduceMotion = false,
   onStrike,
   onComplete,
@@ -107,6 +110,8 @@ function TaskItemInner({
   const SWIPE_THRESHOLD = SW * 0.35;
   const DELETE_THRESHOLD = SW * 0.3;
   const SCRIBBLE_WIDTH = SW * 0.65;
+  const signal = theme.isSignal;
+  const [struck, setStruck] = useState(false);
 
   const translateX = useSharedValue(0);
   const strike = useSharedValue(0);
@@ -136,6 +141,7 @@ function TaskItemInner({
   const fireStrike = useCallback(() => {
     // The "it's done" moment is a success notification, not a thud.
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setStruck(true);
     onStrike?.(task.id);
   }, [task.id, onStrike, hapticsEnabled]);
   const fireTick = useCallback(() => {
@@ -372,7 +378,8 @@ function TaskItemInner({
 
   const strokeW = { width: SCRIBBLE_WIDTH };
   const strokeWShort = { width: SCRIBBLE_WIDTH * 0.9 };
-  const strikeColor = { backgroundColor: theme.accent };
+  // Signal: a grease pencil, not a marker — square-ended strokes.
+  const strikeColor = signal ? { backgroundColor: theme.accent, borderRadius: 0 } : { backgroundColor: theme.accent };
 
   const renderScribble = () => {
     if (scribbleVariant === 'zigzag') {
@@ -446,16 +453,21 @@ function TaskItemInner({
     [beginEdit],
   );
 
+  const radius = { borderRadius: theme.radiusCard };
+  // Signal: the index bullet is the line marker. Express Blue on the first stop,
+  // ink on the rest, Go Green once the pen has landed.
+  const bulletColor = struck ? theme.green : index === 0 ? theme.blue : theme.text;
+
   return (
     <Animated.View style={[styles.container, containerStyle]}>
-      <Animated.View style={[styles.bgReveal, { backgroundColor: theme.green }, bgStyle]}>
+      <Animated.View style={[styles.bgReveal, radius, signal && styles.bgSignal, { backgroundColor: theme.green }, bgStyle]}>
         <Symbol name="checkmark" size={22} color="#fff" weight="heavy" />
-        <Text style={styles.completeLabel} allowFontScaling={false}>
+        <Text style={[styles.completeLabel, signal && styles.completeLabelSignal]} allowFontScaling={false}>
           DONE!
         </Text>
       </Animated.View>
 
-      <Animated.View style={[styles.bgDelete, { backgroundColor: theme.accent }, deleteBgStyle]}>
+      <Animated.View style={[styles.bgDelete, radius, signal && styles.bgSignal, { backgroundColor: theme.accent }, deleteBgStyle]}>
         <Animated.View style={trashStyle}>
           <Symbol name="trash.fill" size={20} color="#fff" weight="semibold" />
         </Animated.View>
@@ -467,11 +479,14 @@ function TaskItemInner({
             onLayout={onCardLayout}
             style={[
               styles.card,
+              radius,
+              theme.shadowCard,
               {
                 backgroundColor: theme.surface,
-                borderColor: editing ? theme.accent : theme.borderStrong,
-                shadowColor: theme.shadow,
+                borderWidth: theme.borderWidth,
+                borderColor: editing ? theme.accent : theme.cardBorder,
               },
+              signal && styles.cardSignal,
               cardSlideStyle,
             ]}
             accessible={!editing}
@@ -485,12 +500,22 @@ function TaskItemInner({
             ]}
             onAccessibilityAction={onAccessibilityAction}
           >
+           {/* Inner layer clips the scribble; the outer keeps its shadow unclipped. */}
+           <View style={[styles.cardInner, { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }, signal ? styles.cardInnerSignal : styles.cardInnerClassic]}>
             <Animated.View style={[styles.glowOverlay, { backgroundColor: theme.accent }, glowStyle]} />
+
+            {signal && (
+              <View style={[styles.bullet, { backgroundColor: bulletColor }]}>
+                <Text style={[styles.bulletText, { color: theme.isDark && !struck && index !== 0 ? theme.bg : '#fff' }]} allowFontScaling={false}>
+                  {index + 1}
+                </Text>
+              </View>
+            )}
 
             {editing ? (
               <TextInput
                 ref={inputRef}
-                style={[styles.taskText, styles.taskInput, { color: theme.text }]}
+                style={[styles.taskText, theme.fontTask, styles.taskInput, { color: theme.text }, signal && styles.taskTextSignal]}
                 value={draft}
                 onChangeText={setDraft}
                 onSubmitEditing={commitEdit}
@@ -505,7 +530,7 @@ function TaskItemInner({
             ) : (
               <Animated.View style={textAnimStyle}>
                 <Text
-                  style={[styles.taskText, { color: theme.text }]}
+                  style={[styles.taskText, theme.fontTask, { color: theme.text }, signal && styles.taskTextSignal]}
                   numberOfLines={3}
                   maxFontSizeMultiplier={1.3}
                 >
@@ -519,6 +544,7 @@ function TaskItemInner({
             <Animated.View style={[styles.splat, strikeColor, styles.splat1, splatStyle]} />
             <Animated.View style={[styles.splat, strikeColor, styles.splat2, splatStyle]} />
             <Animated.View style={[styles.splat, strikeColor, styles.splat3, splatStyle]} />
+           </View>
           </Animated.View>
         </GestureDetector>
       </Animated.View>
@@ -555,6 +581,11 @@ const styles = StyleSheet.create({
     paddingRight: 22,
     borderRadius: 14,
   },
+  // Stop short of the hard-shadow gutter.
+  bgSignal: {
+    right: 4,
+    bottom: 4,
+  },
   completeLabel: {
     position: 'absolute',
     right: 18,
@@ -563,24 +594,60 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.2,
   },
+  completeLabelSignal: {
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
+    fontWeight: '400',
+    letterSpacing: 0,
+  },
   card: {
     minHeight: 58,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+  },
+  // Room for the hard shadow so it isn't clipped by the row container.
+  cardSignal: {
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  cardInner: {
+    flex: 1,
+    minHeight: 56,
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.09,
-    shadowRadius: 12,
-    elevation: 2,
+  },
+  cardInnerClassic: {
+    paddingHorizontal: 17,
+    paddingVertical: 15,
+  },
+  // The stop bullet sits in the gutter.
+  cardInnerSignal: {
+    paddingLeft: 54,
+    paddingRight: 16,
+    paddingVertical: 14,
+  },
+  bullet: {
+    position: 'absolute',
+    left: 14,
+    top: '50%',
+    marginTop: -13,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bulletText: {
+    fontSize: 13,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
   },
   taskText: {
     fontSize: 17,
-    fontWeight: '700',
     lineHeight: 22,
     paddingRight: 8,
+  },
+  taskTextSignal: {
+    fontSize: 16,
+    lineHeight: 21,
   },
   taskInput: {
     paddingVertical: 0,

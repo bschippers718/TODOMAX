@@ -16,6 +16,7 @@ import { TaskItem } from '../components/TaskItem';
 import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
 import { AppBackground } from '../components/AppBackground';
+import { DailyRoute } from '../components/DailyRoute';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { useToast } from '../components/ui/Toast';
@@ -23,7 +24,7 @@ import { ANIMATION_DURATIONS } from '../components/animations';
 import { useTheme, IOS_SPRING } from '../lib/theme';
 import { Settings, Task } from '../lib/types';
 import { ANIMATION_META, getAnimationName } from '../lib/collection';
-import { getPackForAnimation } from '../lib/packs';
+import { getPackForAnimation, packAccent } from '../lib/packs';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const {
+    tasks,
     activeTasks,
     completedTasks,
     streak,
@@ -63,7 +65,6 @@ export default function HomeScreen() {
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
-
   // The pen lands: sound now, while the card is still on screen.
   const handleStrike = useCallback(() => {
     playComplete();
@@ -86,12 +87,12 @@ export default function HomeScreen() {
             title: 'New in your Collection',
             subtitle: getAnimationName(animId),
             icon: ANIMATION_META[animId].symbol,
-            tint: getPackForAnimation(animId)?.accent,
+            tint: (() => { const p = getPackForAnimation(animId); return p ? packAccent(p, theme.isSignal) : undefined; })(),
           });
         }, ANIMATION_DURATIONS[animId] + 450);
       }
     },
-    [completeTask, triggerCelebration, streak, playCelebration, recordEarned, showToast],
+    [completeTask, triggerCelebration, streak, playCelebration, recordEarned, showToast, theme.isSignal],
   );
 
   const toggleCompleted = useCallback(() => {
@@ -102,9 +103,10 @@ export default function HomeScreen() {
   const layout = reduceMotion ? undefined : LinearTransition.springify().damping(IOS_SPRING.damping).stiffness(IOS_SPRING.stiffness);
 
   const renderItem = useCallback(
-    ({ item }: { item: Task }) => (
+    ({ item, index }: { item: Task; index: number }) => (
       <TaskItem
         task={item}
+        index={index}
         settings={settings}
         reduceMotion={reduceMotion}
         onStrike={handleStrike}
@@ -119,6 +121,25 @@ export default function HomeScreen() {
   if (!loaded) return null;
 
   const remaining = activeTasks.length;
+  const signal = theme.isSignal;
+  // Signal controls: enamel sign, ink border, hard shadow. Classic: soft card.
+  const control = [
+    styles.iconButton,
+    theme.shadowControl,
+    {
+      backgroundColor: theme.surfaceSoft,
+      borderColor: theme.cardBorder,
+      borderWidth: theme.borderWidth,
+      borderRadius: theme.radiusControl,
+    },
+    signal && styles.controlSignal,
+  ];
+  const cardChrome = {
+    backgroundColor: theme.surfaceSoft,
+    borderColor: signal ? theme.cardBorder : theme.separator,
+    borderWidth: theme.borderWidth,
+    borderRadius: theme.radiusCard,
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -137,50 +158,79 @@ export default function HomeScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerLeft}>
-          <Text style={[styles.eyebrow, { backgroundColor: theme.goldSoft, color: theme.gold }]} maxFontSizeMultiplier={1.2}>
+          <Text
+            style={[
+              styles.eyebrow,
+              theme.fontLabel,
+              signal ? styles.eyebrowSignal : styles.eyebrowClassic,
+              { backgroundColor: theme.goldSoft, color: theme.onGold, borderColor: theme.cardBorder, borderRadius: theme.radiusTag },
+            ]}
+            maxFontSizeMultiplier={1.2}
+          >
             TODAY
           </Text>
-          <Text style={[styles.title, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
+          <Text
+            style={[styles.title, theme.fontDisplay, signal && styles.titleSignal, { color: theme.text }]}
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             ToDOMax
           </Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
             {remaining > 0
-              ? `${remaining} task${remaining !== 1 ? 's' : ''} remaining`
-              : 'Your board is clear. Add one thing.'}
+              ? signal
+                ? `${remaining} stop${remaining !== 1 ? 's' : ''} remaining`
+                : `${remaining} task${remaining !== 1 ? 's' : ''} remaining`
+              : signal
+                ? 'End of the line. Add one stop.'
+                : 'Your board is clear. Add one thing.'}
           </Text>
         </View>
         <View style={styles.headerRight}>
           <View
-            style={[styles.streakBadge, { backgroundColor: theme.surfaceSoft, borderColor: theme.border, shadowColor: theme.shadow }]}
+            style={[
+              styles.streakBadge,
+              theme.shadowControl,
+              {
+                backgroundColor: theme.surfaceSoft,
+                borderColor: theme.cardBorder,
+                borderWidth: theme.borderWidth,
+                borderRadius: theme.radiusControl,
+              },
+              signal && styles.controlSignal,
+            ]}
             accessible
             accessibilityLabel={`Streak ${streak}`}
           >
-            <Text style={[styles.streakLabel, { color: theme.gold }]} allowFontScaling={false}>
+            <Text style={[styles.streakLabel, theme.fontLabel, signal && styles.streakLabelSignal, { color: signal ? theme.textTertiary : theme.gold }]} allowFontScaling={false}>
               STREAK
             </Text>
-            <Text style={[styles.streakText, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
+            <Text style={[styles.streakText, signal && theme.fontDisplay, signal && styles.streakTextSignal, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
               {streak}
             </Text>
           </View>
           <PressableScale
-            style={[styles.iconButton, { backgroundColor: theme.surfaceSoft, borderColor: theme.border, shadowColor: theme.shadow }]}
+            style={control}
             onPress={() => router.push('/collection')}
             pressedScale={0.92}
             accessibilityLabel={hasNew ? 'Collection, new celebrations earned' : 'Collection'}
           >
-            <Symbol name="film.fill" size={20} color={theme.textSecondary} />
-            {hasNew && <View style={[styles.newDot, { backgroundColor: theme.accent, borderColor: theme.bg }]} />}
+            <Symbol name="film.fill" size={20} color={signal ? theme.text : theme.textSecondary} />
+            {hasNew && <View style={[styles.newDot, { backgroundColor: theme.accent, borderColor: signal ? theme.cardBorder : theme.bg }]} />}
           </PressableScale>
           <PressableScale
-            style={[styles.iconButton, { backgroundColor: theme.surfaceSoft, borderColor: theme.border, shadowColor: theme.shadow }]}
+            style={control}
             onPress={() => router.push('/settings')}
             pressedScale={0.92}
             accessibilityLabel="Settings"
           >
-            <Symbol name="gearshape.fill" size={21} color={theme.textSecondary} />
+            <Symbol name="gearshape.fill" size={21} color={signal ? theme.text : theme.textSecondary} />
           </PressableScale>
         </View>
       </View>
+
+      {signal && <DailyRoute tasks={tasks} reduceMotion={reduceMotion} />}
 
       <Animated.FlatList
         data={activeTasks}
@@ -196,18 +246,29 @@ export default function HomeScreen() {
         ListEmptyComponent={
           <Animated.View
             entering={reduceMotion ? undefined : FadeIn.duration(260)}
-            style={[styles.emptyContainer, { backgroundColor: theme.surfaceSoft, borderColor: theme.separator }]}
+            style={[styles.emptyContainer, cardChrome, signal && styles.emptySignal]}
           >
-            <View style={[styles.emptyBadge, { backgroundColor: theme.surface, borderColor: theme.border, shadowColor: theme.shadow }]}>
-              <Symbol name="checkmark" size={34} color={theme.green} weight="heavy" />
+            <View
+              style={[
+                styles.emptyBadge,
+                theme.shadowControl,
+                {
+                  backgroundColor: signal ? theme.green : theme.surface,
+                  borderColor: theme.cardBorder,
+                  borderWidth: theme.borderWidth,
+                  borderRadius: signal ? 36 : theme.radiusControl,
+                },
+              ]}
+            >
+              <Symbol name="checkmark" size={34} color={signal ? '#fff' : theme.green} weight="heavy" />
             </View>
-            <Text style={[styles.emptyText, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
-              All clear
+            <Text style={[styles.emptyText, theme.fontDisplay, signal && styles.emptyTextSignal, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+              {signal ? 'All stops cleared' : 'All clear'}
             </Text>
             <Text style={[styles.emptySubtext, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-              Add one thing worth crossing off.
+              {signal ? 'Add one stop worth crossing off.' : 'Add one thing worth crossing off.'}
             </Text>
-            <PressableScale style={styles.packsLink} onPress={() => router.push('/packs')}>
+            <PressableScale style={styles.packsLink} onPress={() => router.push('/packs')} pressStyle="scale">
               <Text style={[styles.packsLinkText, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
                 Browse celebration packs
               </Text>
@@ -219,17 +280,18 @@ export default function HomeScreen() {
           completedTasks.length > 0 ? (
             <Animated.View
               layout={layout}
-              style={[styles.completedSection, { backgroundColor: theme.surfaceSoft, borderColor: theme.separator }]}
+              style={[styles.completedSection, cardChrome, signal && styles.completedSignal]}
             >
               <PressableScale
                 style={styles.completedHeader}
                 onPress={toggleCompleted}
                 pressedScale={0.985}
+                pressStyle="scale"
                 accessibilityRole="button"
                 accessibilityState={{ expanded: showCompleted }}
               >
                 <Text style={[styles.completedTitle, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                  Completed ({completedTasks.length})
+                  {signal ? 'Struck' : 'Completed'} ({completedTasks.length})
                 </Text>
                 <Symbol
                   name="chevron.right"
@@ -244,10 +306,18 @@ export default function HomeScreen() {
                   {completedTasks.map((task) => (
                     <View
                       key={task.id}
-                      style={[styles.completedItem, { backgroundColor: theme.surface, borderColor: theme.separator }]}
+                      style={[
+                        styles.completedItem,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: signal ? theme.cardBorder : theme.separator,
+                          borderWidth: signal ? 2 : 1,
+                          borderRadius: theme.radiusCard,
+                        },
+                      ]}
                     >
-                      <View style={[styles.completedStamp, { borderColor: theme.accent }]}>
-                        <Text style={[styles.completedStampText, { color: theme.accent }]} allowFontScaling={false}>
+                      <View style={[styles.completedStamp, { borderColor: signal ? theme.green : theme.accent, borderRadius: theme.radiusTag }, signal && styles.completedStampSignal]}>
+                        <Text style={[styles.completedStampText, theme.fontLabel, signal && styles.completedStampTextSignal, { color: signal ? theme.green : theme.accent }]} allowFontScaling={false}>
                           DONE
                         </Text>
                       </View>
@@ -260,7 +330,7 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                   ))}
-                  <PressableScale style={styles.clearButton} onPress={clearCompleted}>
+                  <PressableScale style={styles.clearButton} onPress={clearCompleted} pressStyle="scale">
                     <Text style={[styles.clearButtonText, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
                       Clear completed
                     </Text>
@@ -298,19 +368,31 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.4,
     marginBottom: 7,
     overflow: 'hidden',
   },
+  eyebrowClassic: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    borderWidth: 0,
+  },
+  // A bordered yellow stamp, like a service-change sticker.
+  eyebrowSignal: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    fontSize: 7,
+    borderWidth: 2,
+  },
   title: {
     fontSize: 38,
-    fontWeight: '800',
-    letterSpacing: -1.1,
+  },
+  titleSignal: {
+    fontSize: 34,
+    letterSpacing: -1.6,
+    marginTop: 2,
   },
   subtitle: {
     fontSize: 14,
@@ -324,34 +406,36 @@ const styles = StyleSheet.create({
   },
   streakBadge: {
     alignItems: 'center',
-    borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
-    borderRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
   },
   streakLabel: {
     fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+  },
+  streakLabelSignal: {
+    fontSize: 6,
+    marginBottom: 2,
   },
   streakText: {
     fontSize: 18,
     fontWeight: '900',
     lineHeight: 20,
   },
+  streakTextSignal: {
+    fontSize: 19,
+    lineHeight: 21,
+    letterSpacing: -0.5,
+  },
   iconButton: {
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
     height: 42,
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
     width: 42,
+  },
+  // Leave room for the 3px hard shadow.
+  controlSignal: {
+    marginRight: 3,
+    marginBottom: 3,
   },
   newDot: {
     position: 'absolute',
@@ -373,25 +457,25 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     paddingVertical: 32,
     paddingHorizontal: 20,
-    borderRadius: 24,
-    borderWidth: 1,
+  },
+  emptySignal: {
+    marginTop: 28,
+    marginHorizontal: 0,
   },
   emptyBadge: {
     alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
     height: 72,
     justifyContent: 'center',
     marginBottom: 16,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
     width: 72,
   },
   emptyText: {
     fontSize: 21,
-    fontWeight: '800',
     marginBottom: 4,
+  },
+  emptyTextSignal: {
+    fontSize: 24,
+    letterSpacing: -0.6,
   },
   emptySubtext: {
     fontSize: 15,
@@ -413,8 +497,9 @@ const styles = StyleSheet.create({
   completedSection: {
     marginTop: 28,
     padding: 14,
-    borderRadius: 20,
-    borderWidth: 1,
+  },
+  completedSignal: {
+    marginRight: 4,
   },
   completedHeader: {
     flexDirection: 'row',
@@ -434,12 +519,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
     marginBottom: 6,
-    borderWidth: 1,
   },
   completedStamp: {
-    borderRadius: 4,
     borderWidth: 1,
     marginRight: 10,
     paddingHorizontal: 5,
@@ -447,10 +529,19 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-4deg' }],
     opacity: 0.75,
   },
+  // Signage is never crooked.
+  completedStampSignal: {
+    borderWidth: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    transform: [],
+    opacity: 1,
+  },
   completedStampText: {
     fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+  },
+  completedStampTextSignal: {
+    fontSize: 6,
   },
   completedTaskText: {
     fontSize: 16,

@@ -20,6 +20,8 @@ export interface AnimationPack {
   price: string | null;
   /** Hex accent used for the pack card. */
   accent: string;
+  /** Line colour in the Signal style (see lib/theme.ts SIGNAL_LINES). */
+  signalAccent: string;
   /** Single glyph shown on the card (kept to text so there's no icon dependency). */
   glyph: string;
   animations: AnimationId[];
@@ -42,6 +44,7 @@ export const PACKS: AnimationPack[] = [
       'Pixel Manhattan, shattering landmarks, planted flags and a stopwatch that beats the clock. The signature ToDOMax set.',
     price: null,
     accent: '#E3221B',
+    signalAccent: '#EE352E', // Stop Red
     glyph: '⚑',
     featured: true,
     animations: ['errandComplete', 'routeDrawn', 'stopwatchStop'],
@@ -58,6 +61,7 @@ export const PACKS: AnimationPack[] = [
     description: 'The everyday set. Quick, punchy and always on.',
     price: null,
     accent: '#178C55',
+    signalAccent: '#00933C', // Go Green
     glyph: '✓',
     animations: [
       'scorePop',
@@ -88,6 +92,7 @@ export const PACKS: AnimationPack[] = [
       'Tecmo-style touchdowns, spikes, interceptions, instant replays and the halftime band.',
     price: '$1.99',
     accent: '#0058F8',
+    signalAccent: '#0039A6', // Express Blue
     glyph: '🏈',
     animations: [
       'touchdown',
@@ -113,6 +118,7 @@ export const PACKS: AnimationPack[] = [
     description: 'Pixel sedans, checkered flags, burnouts and the open road.',
     price: '$1.99',
     accent: '#D9772B',
+    signalAccent: '#FF6319', // Transfer Orange
     glyph: '🚗',
     animations: ['carDash'],
     animationNames: { carDash: 'Finish Line' },
@@ -125,6 +131,7 @@ export const PACKS: AnimationPack[] = [
     description: 'Receipts that print your win, cash drawers that pop, coins that fly.',
     price: '$1.99',
     accent: '#8A5BD6',
+    signalAccent: '#B933AD', // Local Purple
     glyph: '🧾',
     animations: ['cashRegister'],
     animationNames: { cashRegister: 'Ka-Ching' },
@@ -139,6 +146,11 @@ export const PACKS_BY_ID: Record<PackId, AnimationPack> = PACKS.reduce(
   },
   {} as Record<PackId, AnimationPack>,
 );
+
+/** The pack's accent in the current visual style. */
+export function packAccent(pack: AnimationPack, isSignal: boolean): string {
+  return isSignal ? pack.signalAccent : pack.accent;
+}
 
 export function getPackForAnimation(id: AnimationId): AnimationPack | undefined {
   return PACKS.find((p) => p.animations.includes(id));

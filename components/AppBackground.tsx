@@ -13,6 +13,31 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
     setImageFailed(false);
   }, [imageUri]);
 
+  // Signal: signage is opaque. Plain paper (or the user's photo), no map, no grain.
+  if (!theme.showMap) {
+    return (
+      <View pointerEvents="none" style={styles.container}>
+        <View style={[styles.base, { backgroundColor: theme.bg }]} />
+        {showCustomImage ? (
+          <>
+            <Image
+              source={{ uri: imageUri! }}
+              style={styles.customImage}
+              resizeMode="cover"
+              onError={() => setImageFailed(true)}
+            />
+            <View
+              style={[
+                styles.imageScrim,
+                { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.62)' : 'rgba(246, 243, 236, 0.66)' },
+              ]}
+            />
+          </>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View pointerEvents="none" style={styles.container}>
       {showCustomImage ? (
