@@ -14,6 +14,9 @@ export interface Settings {
   customBackgroundUri: string | null;
   /** Visual direction — see lib/theme.ts. */
   style: 'classic' | 'signal';
+  /** After this hour (24h) until 6am, celebrations drop to Minimal. */
+  quietHoursEnabled: boolean;
+  quietHoursStart: 20 | 21 | 22 | 23;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -22,7 +25,22 @@ export const DEFAULT_SETTINGS: Settings = {
   animationMode: 'full',
   customBackgroundUri: null,
   style: 'signal',
+  quietHoursEnabled: false,
+  quietHoursStart: 21,
 };
+
+/** Quiet hours run from `start` until 6am. */
+export function isQuietHour(settings: Settings, now = new Date()): boolean {
+  if (!settings.quietHoursEnabled) return false;
+  const h = now.getHours();
+  return h >= settings.quietHoursStart || h < 6;
+}
+
+/**
+ * Striking several tasks in quick succession shouldn't mean several movies.
+ * Within this window of the last celebration ending, play the minimal version.
+ */
+export const CELEBRATION_COOLDOWN_MS = 20_000;
 
 export type AnimationId =
   | 'touchdown'

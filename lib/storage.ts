@@ -7,6 +7,7 @@ const KEYS = {
   STREAK: '@todomax_streak',
   OWNED_PACKS: '@todomax_owned_packs',
   COLLECTION: '@todomax_collection',
+  HINT_SHOWN: '@todomax_hint_shown',
 } as const;
 
 export async function loadJSON<T>(key: string): Promise<T | null> {

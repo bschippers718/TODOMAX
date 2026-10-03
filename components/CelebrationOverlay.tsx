@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Pressable, Keyboard } from 'react-native';
-import Animated, { FadeOut } from 'react-native-reanimated';
+import { StyleSheet, Pressable, Keyboard, View, useWindowDimensions } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { AnimationId, Settings } from '../lib/types';
 import { useTheme } from '../lib/theme';
 import { animationRegistry, ANIMATION_DURATIONS } from './animations';
+
+const MINIMAL_MS = 1100;
 
 interface CelebrationOverlayProps {
   celebration: {
@@ -21,13 +23,17 @@ export function CelebrationOverlay({
   onDismiss,
 }: CelebrationOverlayProps) {
   const theme = useTheme();
+  const { width: SW, height: SH } = useWindowDimensions();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (celebration.active && celebration.animationId) {
       // The movie owns the screen: drop the keyboard so it plays full-bleed.
       Keyboard.dismiss();
-      const duration = ANIMATION_DURATIONS[celebration.animationId];
+      const full = ANIMATION_DURATIONS[celebration.animationId];
+      // Minimal: a glimpse, not a movie. Long enough to read, short enough to
+      // never get in the way of the next strike.
+      const duration = settings.animationMode === 'minimal' ? Math.min(full, MINIMAL_MS) : full;
       timerRef.current = setTimeout(() => {
         onDismiss();
       }, duration + 200);
@@ -36,7 +42,7 @@ export function CelebrationOverlay({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [celebration.active, celebration.animationId]);
+  }, [celebration.active, celebration.animationId, settings.animationMode]);
 
   if (!celebration.active || !celebration.animationId) return null;
 
@@ -44,6 +50,55 @@ export function CelebrationOverlay({
   if (!AnimationComponent) return null;
 
   const isMinimal = settings.animationMode === 'minimal';
+
+  // Minimal: the same movie through a small window. The animation still lays
+  // out at full screen size and is scaled into a framed card, so nothing in it
+  // needs to know it's being glimpsed.
+  if (isMinimal) {
+    const frameW = Math.round(SW * 0.62);
+    const frameH = Math.round(frameW * 0.78);
+    const scale = frameW / SW;
+    return (
+      <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
+        <Animated.View
+          entering={FadeIn.duration(120)}
+          exiting={FadeOut.duration(150)}
+          style={[styles.animationContainer, styles.minimalHost]}
+          pointerEvents="box-none"
+        >
+          <View
+            style={[
+              styles.frame,
+              theme.shadowCard,
+              {
+                width: frameW,
+                height: frameH,
+                borderRadius: theme.radiusCard,
+                borderColor: theme.cardBorder,
+                borderWidth: theme.borderWidth,
+                backgroundColor: theme.surface,
+              },
+            ]}
+          >
+            <View style={[styles.frameClip, { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }]}>
+              <View
+                style={{
+                  position: 'absolute',
+                  width: SW,
+                  height: SH,
+                  left: (frameW - SW) / 2,
+                  top: (frameH - SH) / 2,
+                  transform: [{ scale }],
+                }}
+              >
+                <AnimationComponent onComplete={onDismiss} streak={celebration.streak} />
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
@@ -53,7 +108,7 @@ export function CelebrationOverlay({
       />
       <Animated.View
         exiting={FadeOut.duration(150)}
-        style={[styles.animationContainer, isMinimal && styles.minimal]}
+        style={styles.animationContainer}
         pointerEvents="box-none"
       >
         <AnimationComponent
@@ -78,7 +133,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  minimal: {
-    opacity: 0.7,
+  minimalHost: {
+    // Sit a little above centre so the glimpse reads as "about the list",
+    // not as a modal.
+    paddingBottom: 120,
+  },
+  // Chrome (border + shadow) and clipping live on separate views: iOS drops
+  // a layer's shadow when that same layer clips.
+  frame: {},
+  frameClip: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
 });

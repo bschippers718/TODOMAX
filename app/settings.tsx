@@ -282,6 +282,38 @@ export default function SettingsScreen() {
                 { key: 'quiet', label: 'Off' },
               ]}
             />
+            <View style={[styles.divider, { backgroundColor: theme.separator }]} />
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleText}>
+                <Text style={[styles.toggleLabel, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                  Quiet hours
+                </Text>
+                <Text style={[styles.toggleHint, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
+                  Late at night, celebrations play as a glimpse, not a movie.
+                </Text>
+              </View>
+              <Switch
+                value={settings.quietHoursEnabled}
+                onValueChange={(val) => updateSetting('quietHoursEnabled', val)}
+                {...(Platform.OS !== 'ios' && { trackColor: { false: theme.separator, true: theme.green } })}
+              />
+            </View>
+            {settings.quietHoursEnabled && <View style={[styles.divider, { backgroundColor: theme.separator }]} />}
+            {settings.quietHoursEnabled && (
+              <OptionRow
+                label="Quiet from"
+                value={String(settings.quietHoursStart) as '20' | '21' | '22' | '23'}
+                onChange={(val) => updateSetting('quietHoursStart', Number(val) as 20 | 21 | 22 | 23)}
+                theme={theme}
+                haptics={settings.hapticsEnabled}
+                options={[
+                  { key: '20', label: '8 PM' },
+                  { key: '21', label: '9 PM' },
+                  { key: '22', label: '10 PM' },
+                  { key: '23', label: '11 PM' },
+                ]}
+              />
+            )}
           </View>
         </View>
 
@@ -321,7 +353,7 @@ export default function SettingsScreen() {
 
         <View style={[styles.infoCard, { backgroundColor: signal ? 'transparent' : theme.surfaceSoft, borderRadius: theme.radiusCard }]}>
           <Text style={[styles.infoText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal.
+            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal. Strike several in a row and the follow-ups play as a glimpse, so the movie never gets in your way.
           </Text>
         </View>
 
@@ -454,6 +486,15 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 16,
+  },
+  toggleText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  toggleHint: {
+    fontSize: 12,
+    marginTop: 3,
+    lineHeight: 16,
   },
   infoCard: {
     padding: 16,

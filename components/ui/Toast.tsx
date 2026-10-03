@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -18,9 +18,12 @@ export interface ToastMessage {
   subtitle?: string;
   icon?: SymbolName | (string & {});
   tint?: string;
+  /** Tapping the toast. The toast dismisses itself right after. */
+  onPress?: () => void;
 }
 
 const SHOW_MS = 2200;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * Lightweight HUD that drops from under the status bar, like iOS's own
@@ -39,15 +42,20 @@ export function useToast() {
     timer.current = setTimeout(() => setMsg(null), SHOW_MS + 500);
   }, []);
 
+  const hide = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setMsg(null);
+  }, []);
+
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  const toast = msg ? <Toast key={key} message={msg} /> : null;
+  const toast = msg ? <Toast key={key} message={msg} onDismiss={hide} /> : null;
   return { show, toast };
 }
 
-function Toast({ message }: { message: ToastMessage }) {
+function Toast({ message, onDismiss }: { message: ToastMessage; onDismiss: () => void }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const progress = useSharedValue(0);
@@ -69,9 +77,18 @@ function Toast({ message }: { message: ToastMessage }) {
 
   const tint = message.tint ?? theme.green;
 
+  const press = message.onPress;
+
   return (
-    <View pointerEvents="none" style={[styles.host, { top: insets.top + 8 }]}>
-      <Animated.View
+    <View pointerEvents={press ? 'box-none' : 'none'} style={[styles.host, { top: insets.top + 8 }]}>
+      <AnimatedPressable
+        disabled={!press}
+        onPress={() => {
+          press?.();
+          onDismiss();
+        }}
+        accessibilityRole={press ? 'button' : undefined}
+        accessibilityHint={press ? 'Opens your Collection' : undefined}
         style={[
           styles.pill,
           theme.isSignal ? theme.shadowControl : styles.pillSoft,
@@ -102,7 +119,7 @@ function Toast({ message }: { message: ToastMessage }) {
             </Text>
           ) : null}
         </View>
-      </Animated.View>
+      </AnimatedPressable>
     </View>
   );
 }

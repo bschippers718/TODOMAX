@@ -44,9 +44,9 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
           styles.container,
           {
             paddingBottom: Math.max(insets.bottom, 12),
-            backgroundColor: theme.composerBg,
-            borderTopColor: signal ? theme.cardBorder : theme.separator,
-            borderTopWidth: signal ? 2 : StyleSheet.hairlineWidth,
+            backgroundColor: signal ? theme.bg : theme.composerBg,
+            borderTopColor: theme.separator,
+            borderTopWidth: StyleSheet.hairlineWidth,
           },
         ]}
       >
@@ -54,10 +54,15 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
           style={[
             styles.inputShell,
             radius,
-            theme.shadowControl,
-            { backgroundColor: theme.inputBg, borderColor: theme.cardBorder, borderWidth: theme.borderWidth },
-            !signal && hasText && { borderColor: theme.accent, shadowColor: theme.accent, shadowOpacity: 0.12 },
-            signal && styles.shellSignal,
+            // Signal: no shell. A rule, a pip and a placeholder — the row only
+            // becomes a sign once it's a todo.
+            signal
+              ? styles.shellSignal
+              : [
+                  theme.shadowControl,
+                  { backgroundColor: theme.inputBg, borderColor: theme.cardBorder, borderWidth: theme.borderWidth },
+                  hasText && { borderColor: theme.accent, shadowColor: theme.accent, shadowOpacity: 0.12 },
+                ],
           ]}
         >
           {signal ? (
@@ -92,7 +97,8 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
             hasText
               ? [theme.shadowControl, { backgroundColor: theme.buttonFill, borderColor: signal ? theme.cardBorder : theme.gold }]
               : signal
-                ? { backgroundColor: theme.bg, borderColor: theme.textTertiary, ...theme.shadowNone }
+                // Idle: just a grey glyph. Colour arrives with the first letter.
+                ? { backgroundColor: 'transparent', borderColor: 'transparent', ...theme.shadowNone }
                 : { backgroundColor: DISABLED_FILL, borderColor: 'transparent', ...theme.shadowNone },
             signal && styles.addSignal,
           ]}
@@ -130,10 +136,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // Leave room for the 3px hard shadow.
   shellSignal: {
-    marginRight: 13,
-    marginBottom: 3,
+    paddingLeft: 6,
+    marginRight: 6,
     minHeight: 50,
   },
   promptPip: {
@@ -159,8 +164,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addSignal: {
-    width: 50,
-    height: 50,
+    width: 46,
+    height: 46,
     marginRight: 3,
     marginBottom: 3,
   },
