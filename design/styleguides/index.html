@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ToDOMax · Style guide explorations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="guide-base.css" />
+<style>
+  :root {
+    --sg-paper: #FAFAF7;
+    --sg-surface: #FFFFFF;
+    --sg-ink: #141416;
+    --sg-line: rgba(20,20,22,.10);
+    --sg-accent: #141416;
+    --sg-display: 'Inter', -apple-system, system-ui, sans-serif;
+    --sg-body: 'Inter', -apple-system, system-ui, sans-serif;
+    --sg-label: 'Press Start 2P', monospace;
+    --sg-eyebrow-size: 9px;
+    --sg-eyebrow-tracking: 0.04em;
+    --sg-display-tracking: -0.035em;
+    --sg-radius-card: 16px;
+  }
+  h1, h2 { font-weight: 800; }
+  h3 { font-weight: 700; }
+  .muted { opacity: .65; }
+
+  .hero { padding: 96px 0 72px; }
+  .hero .lede { max-width: 70ch; }
+
+  /* Direction cards */
+  .dirs { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 36px; }
+  .dir { border-radius: 20px; overflow:hidden; border: 1px solid var(--sg-line); background:#fff; text-decoration:none; color: inherit; display:flex; flex-direction:column; transition: transform .15s ease, box-shadow .15s ease; }
+  .dir:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,.10); }
+  .dir .preview { height: 190px; position: relative; overflow:hidden; }
+  .dir .body { padding: 18px 20px 20px; }
+  .dir .num { font-family: var(--sg-label); font-size: 9px; opacity:.55; }
+  .dir h3 { margin: 6px 0 6px; font-size: 22px; }
+  .dir p { margin: 0; font-size: 14px; opacity: .78; }
+  .dir .strip { display:flex; gap: 0; height: 10px; }
+  .dir .strip span { flex:1; }
+  .dir .open { margin-top: 14px; font-weight: 700; font-size: 13px; }
+
+  /* Preview 01 */
+  .p1 { background: #F6F3EC; display:flex; align-items:center; justify-content:center; }
+  .p1 .sign { background: #0B0B0C; color:#fff; padding: 14px 18px; font: 900 22px/1 'Inter', sans-serif; letter-spacing:-0.02em; border: 2.5px solid #0B0B0C; box-shadow: 6px 6px 0 #FCCC0A; display:flex; align-items:center; gap: 10px; }
+  .p1 .dot { width: 26px; height: 26px; border-radius: 50%; background:#FCCC0A; color:#0B0B0C; display:grid; place-items:center; font-size: 14px; }
+  /* Preview 02 */
+  .p2 { background: radial-gradient(260px 160px at 50% 110%, rgba(255,210,63,.25), transparent 70%), #07080F; display:flex; align-items:center; justify-content:center; }
+  .p2::after { content:''; position:absolute; inset:0; background: repeating-linear-gradient(180deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px); pointer-events:none; }
+  .p2 .marq { font-family: var(--sg-label); font-size: 16px; color: #FFD23F; text-shadow: 0 0 14px rgba(255,210,63,.6); text-align:center; line-height: 1.8; }
+  .p2 .marq small { display:block; font-size: 8px; color: #35D6FF; text-shadow: 0 0 10px rgba(53,214,255,.6); }
+  /* Preview 03 */
+  .p3 { background: radial-gradient(300px 170px at 90% 0%, rgba(159,211,255,.5), transparent 60%), #FFF6E5; display:flex; align-items:flex-end; justify-content:center; gap: 6px; padding-bottom: 0; }
+  .p3 div { width: 30px; border-radius: 6px 6px 0 0; }
+
+  /* Research */
+  .research { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 20px; margin-top: 32px; }
+  .research .card p { font-size: 14px; margin: 0; opacity: .8; }
+  .research .card .apply { margin-top: 12px; font-size: 13px; padding: 10px 12px; border-radius: 10px; background: #F2F2EE; }
+  .research .card .apply b { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .55; display:block; margin-bottom: 3px; }
+  .research .card .src { display:block; margin-top: 10px; font-size: 12px; opacity: .5; }
+
+  /* Comparison */
+  table.cmp { width:100%; border-collapse: collapse; font-size: 14px; margin-top: 32px; }
+  table.cmp th, table.cmp td { text-align:left; padding: 14px 12px; border-bottom: 1px solid var(--sg-line); vertical-align: top; }
+  table.cmp th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .55; font-weight: 700; }
+  table.cmp th.dir-h { font-size: 15px; letter-spacing: -0.01em; text-transform:none; opacity: 1; }
+  table.cmp td:first-child { font-weight: 600; width: 160px; opacity: .7; }
+  table.cmp .mini { display:flex; gap: 4px; margin-bottom: 6px; }
+  table.cmp .mini span { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,.08); }
+  .score { display:inline-block; font-family: var(--sg-label); font-size: 8px; padding: 5px 7px; border-radius: 6px; background:#F2F2EE; }
+  .score.hi { background:#DDF5E6; color:#0F5A32; }
+  .score.mid { background:#FFF2C7; color:#5A4600; }
+  .score.lo { background:#FFE0DB; color:#7A1E12; }
+
+  .reco { border-radius: 20px; border: 2px solid var(--sg-ink); padding: 28px; background: #fff; }
+  .reco h3 { font-size: 24px; margin-bottom: 10px; }
+  .reco p { font-size: 15px; max-width: 72ch; }
+  .reco ol { font-size: 14.5px; line-height: 1.7; padding-left: 20px; }
+  .qs { margin-top: 32px; display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 16px; }
+  .qs .card { font-size: 14px; }
+  .qs .card b { display:block; margin-bottom: 4px; }
+  .refs { columns: 2; column-gap: 32px; padding-left: 18px; }
+  @media (max-width: 720px) { .refs { columns: 1; } table.cmp td:first-child { width: auto; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumb"><span>ToDOMax /</span> Style guide explorations</div>
+  <nav>
+    <a href="#directions">Directions</a>
+    <a href="#research">Research</a>
+    <a href="#compare">Compare</a>
+    <a href="#reco">Recommendation</a>
+    <a href="#questions">Questions</a>
+  </nav>
+</div>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Overnight exploration · Oct 2, 2026</p>
+    <h1>Three ways ToDOMax could look.</h1>
+    <p class="lede">You said you weren't sold on the current colors and style. These are three deliberately different directions — each built on the same product (pixel celebrations, packs, collection, streak) but with its own palette, type, tone, and, importantly, its own <b>shareable artifact</b>. The research below is why that last part matters more than the colors.</p>
+    <p class="note">Each guide is a single HTML page: palette with contrast checks, type specimens, every component we have today redrawn, light + dark home screens, the viral artifact, motion notes, do/don'ts, and a mapping table to <code class="tok">lib/theme.ts</code> so any direction can be adopted without a rewrite.</p>
+  </div>
+</section>
+
+<section id="directions">
+  <div class="wrap">
+    <p class="eyebrow">The directions</p>
+    <h2>Pick a lane, or a blend.</h2>
+    <div class="dirs">
+      <a class="dir" href="01-signal.html">
+        <div class="preview p1"><div class="sign"><span class="dot">●</span> DONE</div></div>
+        <div class="strip"><span style="background:#F6F3EC"></span><span style="background:#0B0B0C"></span><span style="background:#FCCC0A"></span><span style="background:#EE352E"></span><span style="background:#00933C"></span><span style="background:#0039A6"></span><span style="background:#FF6319"></span></div>
+        <div class="body"><div class="num">01</div><h3>Signal</h3>
+          <p>NYC transit signage meets neo‑brutalism. Paper, ink, one yellow. Hard shadows, thick borders, zero fuzz. The most <i>confident</i> direction — looks like a tool for adults.</p>
+          <p class="open">Artifact: the Daily Route card (Wordle‑style grid) →</p></div>
+      </a>
+      <a class="dir" href="02-arcade.html">
+        <div class="preview p2"><div class="marq">HIGH SCORE<small>INSERT COIN · PRESS START</small></div></div>
+        <div class="strip"><span style="background:#07080F"></span><span style="background:#171A2E"></span><span style="background:#FFD23F"></span><span style="background:#FF3D7F"></span><span style="background:#39FF8A"></span><span style="background:#35D6FF"></span><span style="background:#B07CFF"></span></div>
+        <div class="body"><div class="num">02</div><h3>Arcade After Dark</h3>
+          <p>Dark‑first CRT cabinet. Glowing coin‑yellow, laser pink, phosphor green. Leans all the way into the 8‑bit identity the celebrations already have. The most <i>distinctive</i> direction.</p>
+          <p class="open">Artifact: weekly High Scores table with initials →</p></div>
+      </a>
+      <a class="dir" href="03-softplay.html">
+        <div class="preview p3">
+          <div style="height:60px;background:#FFC89B"></div><div style="height:98px;background:#D7C6FF"></div><div style="height:44px;background:#9FD3FF"></div><div style="height:118px;background:#FF6B57"></div><div style="height:30px;background:#FFE27A"></div><div style="height:84px;background:#8FE3B4"></div><div style="height:70px;background:#FFC89B"></div>
+        </div>
+        <div class="strip"><span style="background:#FFF6E5"></span><span style="background:#2B2730"></span><span style="background:#FF6B57"></span><span style="background:#8FE3B4"></span><span style="background:#9FD3FF"></span><span style="background:#FFE27A"></span><span style="background:#D7C6FF"></span></div>
+        <div class="body"><div class="num">03</div><h3>Soft Play</h3>
+          <p>Warm pastel pixel. Butter, cocoa, candy accents, chunky rounded buttons with a 3D edge. A pixel block that grows one storey per task. The most <i>mass‑appeal</i> direction.</p>
+          <p class="open">Artifact: your block as a weekly postcard →</p></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section id="research">
+  <div class="wrap">
+    <p class="eyebrow">Research</p>
+    <h2>Why apps go viral (and what it means for a to‑do app).</h2>
+    <p class="lede">Short version: nobody shares an app because of its colors. They share an <b>artifact</b> the app made about <b>them</b>, and they come back because leaving would <b>lose</b> something. Style matters because it makes the artifact recognisable at thumbnail size.</p>
+    <div class="research">
+      <div class="card">
+        <h3>1. A native, text‑safe artifact</h3>
+        <p>Wordle's grid went viral because it was spoiler‑free, instantly recognisable, and pastable into any chat. BeReal's two‑camera frame and Duolingo's streak screenshots work the same way: the output <i>is</i> the ad.</p>
+        <div class="apply"><b>Applied</b>Each direction ships a share card that contains no task text (privacy), carries the streak, and is unmistakably ToDOMax at 200px wide.</div>
+        <small class="src">Wordle's "elegant" share grid analysis; Duolingo growth retros</small>
+      </div>
+      <div class="card">
+        <h3>2. Loss aversion beats reward</h3>
+        <p>Mobbin's study of 859 streak implementations: streaks work through fear of losing, not joy of gaining. Duolingo's Streak Freeze lifted retention; friend streaks lifted commitment 22%. Finch shows a repair hammer instead of a zero.</p>
+        <div class="apply"><b>Applied</b>Every direction has a visible streak and a forgiveness mechanic (Snow Day / Continue? / scaffolding) so a miss is a near‑loss, not an exit.</div>
+        <small class="src">mobbin.com streak study; blog.duolingo.com</small>
+      </div>
+      <div class="card">
+        <h3>3. Personality is the moat</h3>
+        <p>Clear (2012) sold 350k copies in a week with no buttons and a heat‑map list — people shared videos of a to‑do app. Balatro's pixel identity made it recognisable in a sea of card games. Generic doesn't travel.</p>
+        <div class="apply"><b>Applied</b>Each direction has one unmissable signature: Signal's hard shadows, Arcade's glow + scanlines, Soft Play's growing block.</div>
+        <small class="src">Clear launch coverage; Balatro design write‑ups</small>
+      </div>
+      <div class="card">
+        <h3>4. One signal color</h3>
+        <p>Flighty (Apple Design Award) is achromatic with exactly one blue and one yellow. When a product has one color, that color becomes a logo. Our current palette has five competing accents.</p>
+        <div class="apply"><b>Applied</b>Each direction names a single primary action color (Route Yellow / Coin / Coral) and demotes the rest to semantic roles.</div>
+        <small class="src">Flighty design notes; UXPin 2026 color psychology</small>
+      </div>
+      <div class="card">
+        <h3>5. Fast to first value, tiny commitment</h3>
+        <p>Wordle is one puzzle a day. Duolingo's "Commit to my goal" button copy added 10k daily returns. The ask has to be small and the payoff immediate.</p>
+        <div class="apply"><b>Applied</b>"Add one thing" as the add‑bar prompt across all three; the 3‑second celebration is already the fastest payoff in the category.</div>
+        <small class="src">mobbin.com; Duolingo A/B retros</small>
+      </div>
+      <div class="card">
+        <h3>6. Quiet attribution</h3>
+        <p>Loom, Calendly, and Linear grew through the footer of things their users made. Attribution works when it's small and classy, not when it's a watermark.</p>
+        <div class="apply"><b>Applied</b>Share cards carry <code class="tok">todomax.app</code> in the footer at ≤ 12px, never a logo lockup over the content.</div>
+        <small class="src">PLG case studies (Loom, Calendly, Linear)</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <p class="eyebrow">Compare</p>
+    <h2>Side by side.</h2>
+    <table class="cmp">
+      <tr><th></th>
+        <th class="dir-h"><div class="mini"><span style="background:#F6F3EC"></span><span style="background:#0B0B0C"></span><span style="background:#FCCC0A"></span><span style="background:#EE352E"></span><span style="background:#0039A6"></span></div>01 Signal</th>
+        <th class="dir-h"><div class="mini"><span style="background:#07080F"></span><span style="background:#171A2E"></span><span style="background:#FFD23F"></span><span style="background:#FF3D7F"></span><span style="background:#39FF8A"></span></div>02 Arcade After Dark</th>
+        <th class="dir-h"><div class="mini"><span style="background:#FFF6E5"></span><span style="background:#2B2730"></span><span style="background:#FF6B57"></span><span style="background:#8FE3B4"></span><span style="background:#9FD3FF"></span></div>03 Soft Play</th>
+      </tr>
+      <tr><td>Feels like</td><td>A well‑made tool. Transit map, Teenage Engineering, Linear with a sense of humour.</td><td>A cabinet in a dark bar. Balatro, Celeste, old Nintendo.</td><td>A toy you'd keep on a shelf. Finch, Duolingo, Nintendo (modern).</td></tr>
+      <tr><td>Primary action</td><td>Route Yellow #FCCC0A</td><td>Coin #FFD23F (glows)</td><td>Coral #FF6B57 (3D edge)</td></tr>
+      <tr><td>Type</td><td>Archivo 900 + Inter + Press Start tags</td><td>Press Start marquee + Space Grotesk + JetBrains Mono</td><td>Nunito 800–900 + Silkscreen tags</td></tr>
+      <tr><td>Default mode</td><td>Light (dark is true black)</td><td><b>Dark</b> (day variant exists)</td><td>Light (dark is warm plum)</td></tr>
+      <tr><td>Viral artifact</td><td>Daily Route — Wordle‑style 7‑square grid, spoiler‑free</td><td>Weekly High Scores table — initials, rank, cartridges</td><td>Postcard — your pixel block skyline for the week</td></tr>
+      <tr><td>Retention hook</td><td>Streak as a route number; "Service change" day skips</td><td>"CONTINUE? 9…8…" countdown with Snow Day coin</td><td>Scaffolding on missed days; friend streets</td></tr>
+      <tr><td>Fit with the 8‑bit kit</td><td><span class="score mid">GOOD</span> Kit scenes play in a window with a black border — intentional contrast</td><td><span class="score hi">PERFECT</span> Kit scenes <i>are</i> the UI language</td><td><span class="score mid">GOOD</span> Softer backdrop; scenes feel like daydreams</td></tr>
+      <tr><td>Who it attracts</td><td>Design‑literate adults, productivity Twitter, people who hate "cute"</td><td>Gamers, retro fans, people who screenshot stats</td><td>Broadest. Habit‑app crowd, families, people who found Signal cold</td></tr>
+      <tr><td>Biggest risk</td><td>Can read as harsh or "designer‑y"; yellow on paper fights for attention with 5 line colours</td><td>Dark‑only alienates daytime/outdoor use; neon can tire; App Store screenshots skew "game"</td><td>Most crowded space; one wrong move and it's a Finch clone. Needs the block to be <i>great</i></td></tr>
+      <tr><td>Effort to adopt</td><td><span class="score hi">LOW</span> Token swap + borders/shadows on 4 components</td><td><span class="score mid">MED</span> Token swap + glow helper + scanline overlay + day variant QA</td><td><span class="score lo">HIGH</span> Token swap + 3D button + new Block component + postcard renderer</td></tr>
+      <tr><td>Shareability (gut)</td><td><span class="score hi">HIGH</span> Grid is proven, text‑safe</td><td><span class="score mid">MED‑HI</span> Scores are competitive, less universal</td><td><span class="score hi">HIGH</span> Skyline is personal, pretty, evolves</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="reco">
+  <div class="wrap">
+    <p class="eyebrow">Recommendation</p>
+    <div class="reco">
+      <h3>Lead with Arcade After Dark's identity, borrow Signal's discipline.</h3>
+      <p>The 8‑bit celebrations are the only thing in this category nobody else has, and Arcade is the only direction where the UI and the celebrations speak the same language — the app would look like its best feature. Signal's rules (one action colour, hard geometry, text‑safe share grid) are the ones that keep it from becoming a novelty. Soft Play's <b>growing block</b> is the strongest retention idea of the three and is portable: it works as a pixel skyline in Arcade just as well.</p>
+      <p><b>Honest counter‑case:</b> if the business goal is the broadest possible audience (families, non‑gamers), Soft Play is the safer bet and the block/postcard loop is the best growth engine. Arcade is a sharper wedge; Soft Play is a wider net.</p>
+      <ol>
+        <li>Read all three in order; note gut reactions before reading the comparison.</li>
+        <li>Decide default mode: dark‑first (Arcade) or light‑first (Signal / Soft Play). This single choice removes one direction.</li>
+        <li>Pick the artifact you'd personally post. That's the one worth building first; the palette follows it.</li>
+      </ol>
+    </div>
+
+    <div id="questions" class="qs">
+      <div class="card"><b>Who is the person we picture?</b>Commuter with a dry sense of humour (Signal), gamer who tracks stats (Arcade), or someone who's tried five habit apps (Soft Play)?</div>
+      <div class="card"><b>Is dark‑first acceptable?</b>Arcade's day variant works but is clearly the B‑side. Most daytime screenshots would be dark.</div>
+      <div class="card"><b>Social or solo?</b>High Scores and friend streets both need friends. Daily Route and the postcard work solo. How soon do we want accounts?</div>
+      <div class="card"><b>How much of the kit is sacred?</b>Signal and Soft Play recolour nothing in the kit. Arcade would want its cabinet bezel around the scenes.</div>
+      <div class="card"><b>Name and icon.</b>None of the three were designed around the current icon. Once a direction is picked, the icon should be re‑cut in it.</div>
+      <div class="card"><b>Blend?</b>A fourth option is Signal's layout + Arcade's palette in dark, Soft Play's block as the hero. Say the word and I'll draft it.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Sources consulted</p>
+    <ul class="refs">
+      <li>Mobbin — "What 859 streak designs taught us" (loss aversion, friend streaks +22%, Streak Freeze, Finch repair hammer)</li>
+      <li>Duolingo engineering/product blog — "Commit to my goal" copy test, streak retention</li>
+      <li>Wordle share‑grid analyses (spoiler‑free, text‑based, recognisable)</li>
+      <li>Clear (Realmac, 2012) launch coverage — gesture‑only to‑do, heat‑map list, 350k first‑week sales</li>
+      <li>Flighty design notes — achromatic UI with one blue and one yellow; Apple Design Award</li>
+      <li>UXPin — "App color psychology 2026" (Headspace calm palette; dark‑first needs desaturated accents)</li>
+      <li>Neo‑brutalism 2026 pattern round‑ups (2–4px borders, hard offset shadows, 3–5 colours, industrial yellows)</li>
+      <li>Balatro design retrospectives — pixel identity as recognisability</li>
+      <li>PLG attribution studies — Loom, Calendly, Linear footers</li>
+      <li>NYC MTA / Vignelli signage specs — line colours and type conventions used in Signal</li>
+    </ul>
+    <p class="note">Numbers are as reported by those sources; I didn't independently verify them. Treat them as directional.</p>
+  </div>
+</section>
+
+<footer><div class="wrap">ToDOMax design exploration · <a href="01-signal.html">01 Signal</a> · <a href="02-arcade.html">02 Arcade After Dark</a> · <a href="03-softplay.html">03 Soft Play</a></div></footer>
+</body>
+</html>

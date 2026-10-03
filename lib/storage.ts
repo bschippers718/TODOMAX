@@ -5,6 +5,8 @@ const KEYS = {
   SETTINGS: '@todomax_settings',
   SHUFFLE_BAG: '@todomax_shuffle_bag',
   STREAK: '@todomax_streak',
+  OWNED_PACKS: '@todomax_owned_packs',
+  COLLECTION: '@todomax_collection',
 } as const;
 
 export async function loadJSON<T>(key: string): Promise<T | null> {

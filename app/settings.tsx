@@ -1,50 +1,60 @@
-import { Alert, Image, View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
-import { Stack } from 'expo-router';
+import { Alert, Image, View, Text, StyleSheet, Switch, ScrollView, Platform } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import * as Haptics from 'expo-haptics';
 import { useSettings } from '../hooks/useSettings';
-import { COLORS, Settings } from '../lib/types';
+import { usePacks } from '../hooks/usePacks';
+import { useCollection } from '../hooks/useCollection';
+import { PACKS } from '../lib/packs';
+import { useTheme, Theme } from '../lib/theme';
+import { PressableScale } from '../components/ui/PressableScale';
+import { Symbol } from '../components/ui/Symbol';
+import { HeaderDone } from '../components/ui/HeaderDone';
 
-function OptionRow({
+function OptionRow<T extends string>({
   label,
   options,
   value,
   onChange,
+  theme,
+  haptics,
 }: {
   label: string;
-  options: { key: string; label: string }[];
-  value: string;
-  onChange: (val: any) => void;
+  options: { key: T; label: string }[];
+  value: T;
+  onChange: (val: T) => void;
+  theme: Theme;
+  haptics: boolean;
 }) {
+  const index = Math.max(0, options.findIndex((o) => o.key === value));
   return (
     <View style={styles.optionRow}>
-      <Text style={styles.optionLabel}>{label}</Text>
-      <View style={styles.optionButtons}>
-        {options.map((opt) => (
-          <TouchableOpacity
-            key={String(opt.key)}
-            style={[
-              styles.optionButton,
-              value === opt.key && styles.optionButtonActive,
-            ]}
-            onPress={() => onChange(opt.key)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.optionButtonText,
-                value === opt.key && styles.optionButtonTextActive,
-              ]}
-            >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Text style={[styles.optionLabel, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+        {label}
+      </Text>
+      <SegmentedControl
+        values={options.map((o) => o.label)}
+        selectedIndex={index}
+        appearance={theme.isDark ? 'dark' : 'light'}
+        onChange={(e) => {
+          const next = options[e.nativeEvent.selectedSegmentIndex];
+          if (!next) return;
+          if (haptics) Haptics.selectionAsync();
+          onChange(next.key);
+        }}
+        style={styles.segmented}
+      />
     </View>
   );
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
+  const theme = useTheme();
   const { settings, updateSetting } = useSettings();
+  const { isOwned, unlockedAnimations } = usePacks();
+  const { stats } = useCollection(unlockedAnimations);
+  const ownedCount = PACKS.filter((p) => isOwned(p.id)).length;
 
   const pickBackground = async () => {
     let ImagePicker: typeof import('expo-image-picker');
@@ -109,62 +119,113 @@ export default function SettingsScreen() {
     }
   };
 
+  const card = [styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }];
+  const sectionTitle = [styles.sectionTitle, { color: theme.textSecondary }];
+
   return (
     <>
       <Stack.Screen
         options={{
           title: 'Settings',
-          headerBackTitle: 'Back',
+          headerRight: () => <HeaderDone />,
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.bg }]}
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        alwaysBounceVertical
+      >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Background</Text>
-          <View style={styles.sectionCard}>
-            <Text style={styles.backgroundText}>
+          <Text style={sectionTitle}>Background</Text>
+          <View style={card}>
+            <Text style={[styles.backgroundText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
               Choose a photo from your camera roll. ToDOMax will soften it behind the paper surface so tasks stay readable.
             </Text>
             {settings.customBackgroundUri ? (
               <Image
                 source={{ uri: settings.customBackgroundUri }}
-                style={styles.backgroundPreview}
+                style={[styles.backgroundPreview, { borderColor: theme.border }]}
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.defaultPreview}>
-                <Text style={styles.defaultPreviewText}>Paper background</Text>
+              <View style={[styles.defaultPreview, { borderColor: theme.border }]}>
+                <Image source={theme.mapAsset} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                <View style={[styles.defaultPreviewLabel, { backgroundColor: theme.surface }]}>
+                  <Symbol name="map.fill" size={13} color={theme.textSecondary} />
+                  <Text style={[styles.defaultPreviewText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                    Pixel Manhattan
+                  </Text>
+                </View>
               </View>
             )}
             <View style={styles.backgroundActions}>
-              <TouchableOpacity
-                style={[styles.backgroundButton, styles.backgroundButtonPrimary]}
+              <PressableScale
+                style={[styles.backgroundButton, { backgroundColor: theme.buttonFill, borderColor: theme.buttonFill }]}
                 onPress={pickBackground}
-                activeOpacity={0.75}
               >
-                <Text style={styles.backgroundButtonPrimaryText}>
+                <Text style={[styles.backgroundButtonPrimaryText, { color: theme.buttonText }]} maxFontSizeMultiplier={1.3}>
                   {settings.customBackgroundUri ? 'Change photo' : 'Choose photo'}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
               {settings.customBackgroundUri && (
-                <TouchableOpacity
-                  style={styles.backgroundButton}
+                <PressableScale
+                  style={[styles.backgroundButton, { borderColor: theme.borderStrong }]}
                   onPress={() => updateSetting('customBackgroundUri', null)}
-                  activeOpacity={0.75}
                 >
-                  <Text style={styles.backgroundButtonText}>Remove</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.backgroundButtonText, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
+                    Remove
+                  </Text>
+                </PressableScale>
               )}
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Celebrations</Text>
-          <View style={styles.sectionCard}>
+          <Text style={sectionTitle}>Celebrations</Text>
+          <View style={card}>
+            <PressableScale
+              style={styles.linkRow}
+              onPress={() => router.push('/collection')}
+              pressedScale={0.985}
+              accessibilityRole="link"
+            >
+              <View style={styles.linkTextWrap}>
+                <Text style={[styles.linkTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                  Collection
+                </Text>
+                <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                  {stats.earned} of {stats.total} celebrations earned
+                  {stats.fresh > 0 ? ` · ${stats.fresh} new` : ''}
+                </Text>
+              </View>
+              <Symbol name="chevron.right" size={14} color={theme.textTertiary} weight="bold" />
+            </PressableScale>
+            <View style={[styles.divider, { backgroundColor: theme.separator }]} />
+            <PressableScale
+              style={styles.linkRow}
+              onPress={() => router.push('/packs')}
+              pressedScale={0.985}
+              accessibilityRole="link"
+            >
+              <View style={styles.linkTextWrap}>
+                <Text style={[styles.linkTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                  Celebration Packs
+                </Text>
+                <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                  {ownedCount} of {PACKS.length} packs unlocked · browse & preview
+                </Text>
+              </View>
+              <Symbol name="chevron.right" size={14} color={theme.textTertiary} weight="bold" />
+            </PressableScale>
+            <View style={[styles.divider, { backgroundColor: theme.separator }]} />
             <OptionRow
               label="Animation mode"
               value={settings.animationMode}
               onChange={(val) => updateSetting('animationMode', val)}
+              theme={theme}
+              haptics={settings.hapticsEnabled}
               options={[
                 { key: 'full', label: 'Full' },
                 { key: 'minimal', label: 'Minimal' },
@@ -175,12 +236,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sound</Text>
-          <View style={styles.sectionCard}>
+          <Text style={sectionTitle}>Sound</Text>
+          <View style={card}>
             <OptionRow
               label="Volume"
               value={settings.soundLevel}
               onChange={(val) => updateSetting('soundLevel', val)}
+              theme={theme}
+              haptics={settings.hapticsEnabled}
               options={[
                 { key: 'silent', label: 'Off' },
                 { key: 'subtle', label: 'Low' },
@@ -191,28 +254,29 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Haptics</Text>
-          <View style={styles.sectionCard}>
+          <Text style={sectionTitle}>Haptics</Text>
+          <View style={card}>
             <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Vibration feedback</Text>
+              <Text style={[styles.toggleLabel, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                Vibration feedback
+              </Text>
               <Switch
                 value={settings.hapticsEnabled}
                 onValueChange={(val) => updateSetting('hapticsEnabled', val)}
-                trackColor={{ false: COLORS.separator, true: COLORS.green }}
-                thumbColor={COLORS.white}
+                {...(Platform.OS !== 'ios' && { trackColor: { false: theme.separator, true: theme.green } })}
               />
             </View>
           </View>
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration.
+        <View style={[styles.infoCard, { backgroundColor: theme.surfaceSoft }]}>
+          <Text style={[styles.infoText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal.
           </Text>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>ToDOMax v1.0</Text>
+          <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v1.0</Text>
         </View>
       </ScrollView>
     </>
@@ -222,10 +286,10 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
   },
   content: {
     padding: 20,
+    paddingBottom: 40,
   },
   section: {
     marginBottom: 28,
@@ -233,21 +297,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
     paddingLeft: 4,
   },
   sectionCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
   },
   backgroundText: {
-    color: COLORS.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
@@ -255,23 +315,28 @@ const styles = StyleSheet.create({
   backgroundPreview: {
     height: 140,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
   },
   defaultPreview: {
-    height: 92,
+    height: 110,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    backgroundColor: '#F7F1E4',
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  defaultPreviewLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
   defaultPreviewText: {
-    color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   backgroundActions: {
@@ -281,58 +346,48 @@ const styles = StyleSheet.create({
   backgroundButton: {
     flex: 1,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingVertical: 11,
-    backgroundColor: COLORS.bg,
-  },
-  backgroundButtonPrimary: {
-    backgroundColor: '#221F1A',
-    borderColor: '#221F1A',
+    paddingVertical: 12,
   },
   backgroundButtonText: {
-    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  backgroundButtonPrimaryText: {
     fontSize: 15,
     fontWeight: '700',
   },
-  backgroundButtonPrimaryText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '800',
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  linkTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  linkTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  linkSub: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 14,
   },
   optionRow: {
     marginBottom: 4,
   },
   optionLabel: {
-    fontSize: 15,
-    color: COLORS.text,
+    fontSize: 16,
     marginBottom: 10,
   },
-  optionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  optionButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-  },
-  optionButtonActive: {
-    borderColor: COLORS.blue,
-    backgroundColor: 'rgba(0, 122, 255, 0.08)',
-  },
-  optionButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-  },
-  optionButtonTextActive: {
-    color: COLORS.blue,
+  segmented: {
+    height: 34,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -340,18 +395,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggleLabel: {
-    fontSize: 15,
-    color: COLORS.text,
+    fontSize: 16,
   },
   infoCard: {
     padding: 16,
-    backgroundColor: COLORS.cream,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 28,
   },
   infoText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     lineHeight: 20,
   },
   footer: {
@@ -360,6 +412,5 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
-    color: COLORS.dimmed,
   },
 });

@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Pressable } from 'react-native';
+import { StyleSheet, Pressable, Keyboard } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 import { AnimationId, Settings } from '../lib/types';
-import { animationRegistry } from './animations';
+import { useTheme } from '../lib/theme';
+import { animationRegistry, ANIMATION_DURATIONS } from './animations';
 
 interface CelebrationOverlayProps {
   celebration: {
@@ -14,32 +15,18 @@ interface CelebrationOverlayProps {
   onDismiss: () => void;
 }
 
-const ANIMATION_DURATIONS: Record<AnimationId, number> = {
-  touchdown: 3800,
-  scorePop: 2650,
-  streakCombo: 2600,
-  perfectStamp: 2600,
-  footballSpike: 2950,
-  swordSlash: 2800,
-  rubberStamp: 2800,
-  trophyRaise: 3300,
-  singleConfetti: 3150,
-  halftimeBand: 3350,
-  instantReplay: 3200,
-  interception: 3050,
-  levelClear: 3500,
-  pixelPowerUp: 3200,
-};
-
 export function CelebrationOverlay({
   celebration,
   settings,
   onDismiss,
 }: CelebrationOverlayProps) {
+  const theme = useTheme();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (celebration.active && celebration.animationId) {
+      // The movie owns the screen: drop the keyboard so it plays full-bleed.
+      Keyboard.dismiss();
       const duration = ANIMATION_DURATIONS[celebration.animationId];
       timerRef.current = setTimeout(() => {
         onDismiss();
@@ -59,8 +46,11 @@ export function CelebrationOverlay({
   const isMinimal = settings.animationMode === 'minimal';
 
   return (
-    <Pressable style={styles.overlay} onPress={onDismiss}>
-      <Animated.View style={styles.backdrop} exiting={FadeOut.duration(180)} />
+    <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
+      <Animated.View
+        style={[styles.backdrop, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.42)' : 'rgba(34, 31, 26, 0.16)' }]}
+        exiting={FadeOut.duration(180)}
+      />
       <Animated.View
         exiting={FadeOut.duration(150)}
         style={[styles.animationContainer, isMinimal && styles.minimal]}
@@ -82,7 +72,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(34, 31, 26, 0.16)',
   },
   animationContainer: {
     flex: 1,

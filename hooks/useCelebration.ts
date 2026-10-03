@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import * as Haptics from 'expo-haptics';
 import { AnimationId, Settings } from '../lib/types';
 import { useShuffleBag } from './useShuffleBag';
 
@@ -9,24 +8,20 @@ interface CelebrationState {
   streak: number;
 }
 
-export function useCelebration(settings: Settings) {
-  const { draw } = useShuffleBag();
+export function useCelebration(settings: Settings, pool: AnimationId[]) {
+  const { draw } = useShuffleBag(pool);
   const [celebration, setCelebration] = useState<CelebrationState>({
     active: false,
     animationId: null,
     streak: 0,
   });
 
+  // Haptics for the completion moment live in TaskItem (the pen landing);
+  // firing another "success" here would double-buzz ~700ms later.
   const triggerCelebration = useCallback(
     (streak: number): AnimationId | null => {
       if (settings.animationMode === 'quiet') return null;
-
       const animationId = draw();
-
-      if (settings.hapticsEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-
       setCelebration({ active: true, animationId, streak });
       return animationId;
     },

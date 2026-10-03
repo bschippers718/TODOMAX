@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ToDOMax · Direction 01 — Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="guide-base.css" />
+<style>
+  :root {
+    /* ---- Signal tokens ---- */
+    --paper: #F6F3EC;
+    --white: #FFFFFF;
+    --ink: #0B0B0C;
+    --ink-2: #4A4A4F;
+    --ink-3: #8A8A91;
+    --line: #0B0B0C;
+    --route: #FCCC0A;      /* N/Q/R/W yellow — primary action + "the route" */
+    --stop: #EE352E;       /* 1/2/3 red — strike ink, destructive */
+    --go: #00933C;         /* 4/5/6 green — done, earned */
+    --express: #0039A6;    /* A/C/E blue — links, store price */
+    --transfer: #FF6319;   /* B/D/F/M orange — Garage pack */
+    --local: #B933AD;      /* 7 purple — Checkout pack */
+    --shuttle: #808183;    /* S grey — disabled, locked */
+
+    --sg-paper: var(--paper);
+    --sg-surface: var(--white);
+    --sg-ink: var(--ink);
+    --sg-line: rgba(11, 11, 12, 0.14);
+    --sg-accent: var(--stop);
+    --sg-display: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --sg-body: 'Inter', -apple-system, system-ui, sans-serif;
+    --sg-label: 'Press Start 2P', monospace;
+    --sg-eyebrow-size: 9px;
+    --sg-eyebrow-tracking: 0.08em;
+    --sg-display-tracking: -0.035em;
+    --sg-radius-card: 6px;
+    --shadow-hard: 4px 4px 0 var(--ink);
+    --shadow-hard-sm: 3px 3px 0 var(--ink);
+  }
+  h1, h2 { font-weight: 900; }
+  h3 { font-weight: 800; }
+
+  /* Hero */
+  .hero {
+    background: var(--ink);
+    color: var(--paper);
+    border-bottom: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero .eyebrow { color: var(--route); }
+  .hero h1 { color: var(--white); }
+  .hero .lede { color: rgba(246,243,236,0.8); }
+  .hero .stripe {
+    display: flex;
+    gap: 0;
+    margin-top: 44px;
+    border: 3px solid var(--white);
+  }
+  .hero .stripe div { flex: 1; height: 18px; }
+  .sign {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--white);
+    color: var(--ink);
+    padding: 10px 14px 10px 10px;
+    border: 3px solid var(--ink);
+    box-shadow: var(--shadow-hard);
+    font-family: var(--sg-display);
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    margin-top: 26px;
+  }
+  .sign .bullet {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 16px; color: var(--white); background: var(--go);
+  }
+
+  /* Reason cards */
+  .why .card { border: 2px solid var(--ink); box-shadow: var(--shadow-hard); }
+  .why .card h3 { font-size: 17px; }
+  .why .card p { font-size: 14px; margin: 0; }
+  .why .card .src { display:block; margin-top: 10px; font-size: 12px; opacity: .6; }
+
+  /* Swatch frames */
+  .swatch { border: 2px solid var(--ink); border-radius: 6px; }
+  .swatch .chip { font-weight: 700; }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--sg-display);
+    font-weight: 900;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    padding: 12px 18px;
+    border: 2.5px solid var(--ink);
+    background: var(--white);
+    color: var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+    border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transform: translate(0,0);
+    transition: transform .08s, box-shadow .08s;
+    cursor: default;
+  }
+  .btn.primary { background: var(--route); }
+  .btn.danger { background: var(--stop); color: var(--white); }
+  .btn.price { background: var(--express); color: var(--white); }
+  .btn.pressed { transform: translate(3px,3px); box-shadow: 0 0 0 var(--ink); }
+  .btn.disabled { background: var(--paper); color: var(--shuttle); border-color: var(--shuttle); box-shadow: none; }
+
+  /* Components grid */
+  .comp { border: 2px solid var(--ink); border-radius: 6px; padding: 18px; background: var(--white); box-shadow: var(--shadow-hard); }
+  .comp h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; font-family: var(--sg-body); opacity: .6; margin-bottom: 14px; }
+  .comp .stack { display: grid; gap: 12px; }
+
+  /* Task row */
+  .row {
+    position: relative;
+    border: 2.5px solid var(--ink);
+    background: var(--white);
+    padding: 14px 16px;
+    font-family: var(--sg-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    border-radius: 6px;
+    box-shadow: var(--shadow-hard-sm);
+    overflow: hidden;
+  }
+  .row .idx {
+    display: inline-grid; place-items: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--ink); color: var(--white);
+    font-family: var(--sg-body); font-weight: 800; font-size: 12px;
+    margin-right: 10px; vertical-align: -6px;
+  }
+  .row.swiping { transform: translateX(42px); background: var(--white); }
+  .row-wrap { position: relative; }
+  .row-wrap .under { position: absolute; inset: 0; background: var(--go); border-radius: 6px; display:flex; align-items:center; padding-left: 14px; color: var(--white); font-weight: 900; font-family: var(--sg-display); }
+  .row.struck .txt { color: var(--ink-3); }
+  .row.struck::after {
+    content: ''; position: absolute; left: 44px; right: 20px; top: 50%; height: 5px;
+    background: var(--stop); transform: rotate(-2.5deg); border-radius: 0;
+  }
+  .row.struck::before {
+    content: ''; position: absolute; left: 52px; right: 40px; top: 56%; height: 4px;
+    background: var(--stop); transform: rotate(2deg);
+  }
+
+  /* Add bar */
+  .addbar { display: flex; gap: 10px; }
+  .addbar .field { flex: 1; border: 2.5px solid var(--ink); border-radius: 6px; padding: 12px 14px; background: var(--white); color: var(--ink-3); font-weight: 600; box-shadow: var(--shadow-hard-sm); display:flex; align-items:center; gap: 8px; }
+  .addbar .plus { width: 48px; border: 2.5px solid var(--ink); border-radius: 6px; background: var(--route); display:grid; place-items:center; font-weight: 900; font-size: 22px; box-shadow: var(--shadow-hard-sm); }
+
+  /* Pack card */
+  .pack { border: 2.5px solid var(--ink); border-radius: 6px; background: var(--white); box-shadow: var(--shadow-hard); overflow: hidden; }
+  .pack .head { display:flex; align-items:center; gap: 12px; padding: 14px; border-bottom: 2.5px solid var(--ink); }
+  .pack .head .bullet { width: 40px; height: 40px; border-radius: 50%; display:grid; place-items:center; color: var(--white); font-weight: 900; font-size: 18px; font-family: var(--sg-display); }
+  .pack .head b { font-family: var(--sg-display); font-size: 18px; font-weight: 900; display:block; letter-spacing: -0.02em; }
+  .pack .head small { font-size: 12.5px; color: var(--ink-2); }
+  .pack .body { padding: 14px; font-size: 13.5px; }
+  .pack .chips { display:flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+  .pack .chip { border: 2px solid var(--ink); padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--paper); }
+  .pack .foot { display:flex; justify-content: space-between; align-items:center; }
+  .tag { font-family: var(--sg-label); font-size: 7px; padding: 6px 8px; border: 2px solid var(--ink); background: var(--route); }
+
+  /* Collection tile */
+  .tiles { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tile { border: 2.5px solid var(--ink); border-radius: 6px; background: var(--white); aspect-ratio: 1 / 1.08; display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 6px; text-align:center; padding: 8px; box-shadow: var(--shadow-hard-sm); }
+  .tile .ico { width: 36px; height: 36px; border-radius: 50%; display:grid; place-items:center; font-size: 18px; color: var(--white); font-weight: 900; }
+  .tile b { font-family: var(--sg-display); font-size: 12px; font-weight: 800; line-height: 1.1; }
+  .tile small { font-family: var(--sg-label); font-size: 6px; }
+  .tile.hidden { border-style: dashed; box-shadow: none; background: var(--paper); }
+  .tile.hidden .ico { background: var(--paper); color: var(--ink-3); border: 2px dashed var(--ink-3); }
+  .tile.locked { opacity: .55; box-shadow: none; }
+
+  /* Phone */
+  .phone .screen { background: var(--paper); }
+  .screen .hdr { padding: 62px 20px 14px; }
+  .screen .hdr .ey { font-family: var(--sg-label); font-size: 7px; color: var(--ink); background: var(--route); display:inline-block; padding: 5px 7px; border: 2px solid var(--ink); }
+  .screen .hdr h4 { font-family: var(--sg-display); font-weight: 900; font-size: 34px; letter-spacing: -0.04em; margin: 10px 0 2px; line-height: 1; }
+  .screen .hdr .sub { font-size: 12px; color: var(--ink-2); }
+  .screen .hdr .streak { position:absolute; right: 18px; top: 66px; border: 2.5px solid var(--ink); background: var(--white); padding: 6px 10px; box-shadow: var(--shadow-hard-sm); text-align:center; }
+  .screen .hdr .streak small { display:block; font-family: var(--sg-label); font-size: 5px; }
+  .screen .hdr .streak b { font-family: var(--sg-display); font-size: 18px; font-weight: 900; }
+  .screen .list { padding: 6px 16px; display: grid; gap: 10px; }
+  .screen .row { font-size: 14px; padding: 12px 14px; }
+  .screen .route-strip { margin: 16px 16px 0; border: 2.5px solid var(--ink); background: var(--white); padding: 10px; box-shadow: var(--shadow-hard-sm); }
+  .screen .route-strip small { font-family: var(--sg-label); font-size: 6px; display:block; margin-bottom: 8px; }
+  .screen .route-strip .sq { display:flex; gap: 5px; }
+  .screen .route-strip .sq div { flex:1; height: 16px; border: 2px solid var(--ink); }
+  .screen .bar { position:absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 30px; background: var(--paper); border-top: 2.5px solid var(--ink); }
+  .screen .bar .addbar .field { font-size: 13px; padding: 10px 12px; }
+  .screen .bar .addbar .plus { width: 42px; }
+
+  /* Dark phone */
+  .phone.dark .screen { background: #000; color: var(--white); }
+  .phone.dark .row { background: #111; color: var(--white); border-color: var(--white); box-shadow: 3px 3px 0 var(--white); }
+  .phone.dark .row .idx { background: var(--white); color: var(--ink); }
+  .phone.dark .hdr .sub { color: #B5B5BA; }
+  .phone.dark .hdr .streak { background: #111; border-color: var(--white); box-shadow: 3px 3px 0 var(--white); }
+  .phone.dark .route-strip { background: #111; border-color: var(--white); box-shadow: 3px 3px 0 var(--white); }
+  .phone.dark .route-strip .sq div { border-color: var(--white); }
+  .phone.dark .bar { background: #000; border-color: var(--white); }
+  .phone.dark .addbar .field { background: #111; border-color: var(--white); box-shadow: 3px 3px 0 var(--white); color: #8A8A91; }
+  .phone.dark .addbar .plus { border-color: var(--white); box-shadow: 3px 3px 0 var(--white); }
+
+  /* Share card */
+  .share {
+    width: 340px; background: var(--white); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); padding: 18px; font-family: var(--sg-display);
+  }
+  .share .top { display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px; }
+  .share .top b { font-weight: 900; font-size: 20px; letter-spacing: -0.03em; }
+  .share .top small { font-family: var(--sg-label); font-size: 7px; background: var(--route); border: 2px solid var(--ink); padding: 5px 7px; }
+  .share .grid-sq { display:grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .share .grid-sq div { aspect-ratio: 1; border: 2.5px solid var(--ink); }
+  .share .legend { display:flex; gap: 12px; margin-top: 12px; font-family: var(--sg-body); font-size: 11.5px; font-weight: 600; }
+  .share .legend i { display:inline-block; width: 11px; height: 11px; border: 2px solid var(--ink); vertical-align: -1px; margin-right: 4px; }
+  .share .foot { margin-top: 14px; font-family: var(--sg-body); font-size: 12px; color: var(--ink-2); display:flex; justify-content:space-between; }
+
+  .toast { display:inline-flex; align-items:center; gap: 10px; background: var(--white); border: 2.5px solid var(--ink); padding: 10px 14px 10px 10px; box-shadow: var(--shadow-hard-sm); font-weight: 700; font-size: 14px; }
+  .toast .bullet { width: 26px; height: 26px; border-radius: 50%; background: var(--go); color: var(--white); display:grid; place-items:center; font-weight: 900; }
+
+  .motion { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .motion .card { border: 2px solid var(--ink); box-shadow: var(--shadow-hard-sm); font-size: 13.5px; }
+  .motion .card b { font-family: var(--sg-display); display:block; font-size: 15px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumb"><span>ToDOMax style guides /</span> 01 · Signal</div>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="#why">Why</a>
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#components">Components</a>
+    <a href="#screens">Screens</a>
+    <a href="#viral">Viral artifact</a>
+    <a href="#rules">Rules</a>
+  </nav>
+</div>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Direction 01</p>
+    <h1>Signal.</h1>
+    <p class="lede">Your to‑do list as subway signage. Black ink, white enamel, one yellow route and nine line colors doing all the work. Nothing soft, nothing decorative — every mark means something.</p>
+    <div class="sign"><span class="bullet">✓</span> 4 stops today · Uptown via Dentist</div>
+    <div class="stripe">
+      <div style="background:#EE352E"></div><div style="background:#FF6319"></div><div style="background:#FCCC0A"></div><div style="background:#00933C"></div><div style="background:#0039A6"></div><div style="background:#B933AD"></div><div style="background:#808183"></div>
+    </div>
+  </div>
+</section>
+
+<section id="why" class="why">
+  <div class="wrap">
+    <p class="eyebrow">Why this direction</p>
+    <h2>Borrow what made the viral ones legible at a glance.</h2>
+    <p class="lede">Signal takes the <b>Errand Run</b> concept literally — the map, the route, the stops — and renders it in the most legible visual system ever shipped to millions of people a day: transit wayfinding.</p>
+    <div class="grid grid-3" style="margin-top:32px">
+      <div class="card">
+        <h3>Wordle: the result is the ad</h3>
+        <p>Wordle grew on a green/yellow/grey grid that told the whole story without spoiling anything. Signal gives ToDOMax its own grid: the <b>Daily Route</b> strip — one square per task, line‑colored by outcome. It's screenshot‑native and readable in a feed at thumbnail size.</p>
+        <small class="src">thehardcopy.co · smithsonianmag.com</small>
+      </div>
+      <div class="card">
+        <h3>Clear: color = priority, no buttons</h3>
+        <p>Clear (2012) sold 350k copies in two weeks on a heat‑map list and pure gestures. Signal keeps our swipe‑to‑strike and adds <b>line‑color priority</b>: the top stop is Express blue, the rest are Local. One glance tells you what matters.</p>
+        <small class="src">techcrunch.com · technologyreview.com</small>
+      </div>
+      <div class="card">
+        <h3>Flighty: one signal color</h3>
+        <p>Flighty's palette is almost achromatic with a single vivid blue for actions and amber for conversion. Signal reserves <b>Route Yellow</b> for the one thing you can do next, and <b>Express Blue</b> for the one thing you can buy.</p>
+        <small class="src">refero.design · mobbin.com</small>
+      </div>
+    </div>
+    <p class="note" style="margin-top:28px">Neo‑brutalist UI (2–4px black borders, hard offset shadows, industrial yellows/oranges/greens) is the most active indie‑app territory of 2026 — but it only works when the palette is tightly constrained to 3–5 colors with a single dominant background. Signal's discipline is: paper, ink, route, plus line colors used strictly as semantics.</p>
+  </div>
+</section>
+
+<section id="color">
+  <div class="wrap">
+    <p class="eyebrow">Color</p>
+    <h2>Paper, ink, route — and the lines.</h2>
+    <p class="lede">The three core colors carry 90% of every screen. Line colors are never decorative: each maps to a meaning or a pack.</p>
+    <h3 style="margin-top:36px">Core</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#F6F3EC">#F6F3EC</div><div class="meta"><b>Paper</b><small>Screen background. Warm, not cream.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF">#FFFFFF</div><div class="meta"><b>Enamel</b><small>Cards, signs, inputs.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#0B0B0C;color:#fff">#0B0B0C</div><div class="meta"><b>Ink</b><small>Text, 2.5px borders, hard shadows. Dark mode background.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FCCC0A">#FCCC0A</div><div class="meta"><b>Route Yellow</b><small>The one primary action. Add button, TODAY tag, the drawn route.</small></div></div>
+    </div>
+    <h3 style="margin-top:36px">Lines (semantic)</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#EE352E;color:#fff">#EE352E</div><div class="meta"><b>Stop Red</b><small>Strike‑out ink. Delete. Errand Run pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#00933C;color:#fff">#00933C</div><div class="meta"><b>Go Green</b><small>Done, earned, swipe reveal. Starter pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#0039A6;color:#fff">#0039A6</div><div class="meta"><b>Express Blue</b><small>Links, price capsules, top‑priority stop. Game Day pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF6319;color:#fff">#FF6319</div><div class="meta"><b>Transfer Orange</b><small>Garage pack. Carried‑over tasks in the Daily Route.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#B933AD;color:#fff">#B933AD</div><div class="meta"><b>Local Purple</b><small>Checkout pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#808183;color:#fff">#808183</div><div class="meta"><b>Shuttle Grey</b><small>Disabled, locked, placeholder.</small></div></div>
+    </div>
+    <table class="tokens" style="margin-top:36px">
+      <tr><th>Context</th><th>Light</th><th>Dark</th><th>Contrast</th></tr>
+      <tr><td>Body text on background</td><td>Ink on Paper</td><td>Enamel on #000</td><td>19.4 : 1 / 21 : 1</td></tr>
+      <tr><td>Primary button</td><td>Ink on Route Yellow</td><td>Ink on Route Yellow (unchanged)</td><td>13.8 : 1</td></tr>
+      <tr><td>Price capsule</td><td>Enamel on Express Blue</td><td>same</td><td>10.6 : 1</td></tr>
+      <tr><td>Borders / shadows</td><td>Ink, 2.5px, offset 3–4px</td><td>Enamel, 2.5px, offset 3–4px</td><td>—</td></tr>
+    </table>
+    <p class="note">Dark mode flips the paper/ink pair and keeps every line color exactly as‑is — true black (#000) is correct here, not iOS grey. Neo‑brutalist dark surfaces read best at full contrast.</p>
+  </div>
+</section>
+
+<section id="type">
+  <div class="wrap">
+    <p class="eyebrow">Typography</p>
+    <h2>Helvetica's loud cousin, plus a bitmap whisper.</h2>
+    <p class="lede">Archivo Black for headlines and task text — it has the MTA‑Helvetica stance without the license. Inter for everything secondary. Press Start 2P only for 6–8px tags, where it reads as a stamp, not a font.</p>
+    <div style="margin-top:28px">
+      <div class="specimen"><div class="spec-meta">Display<br>Archivo 900<br>34–88px · −0.035em</div><div style="font-family:var(--sg-display);font-weight:900;font-size:56px;letter-spacing:-0.035em;line-height:1">Cross it off.</div></div>
+      <div class="specimen"><div class="spec-meta">Task<br>Archivo 700<br>16px · −0.01em</div><div style="font-family:var(--sg-display);font-weight:700;font-size:18px">Pick up dry cleaning on 7th Ave</div></div>
+      <div class="specimen"><div class="spec-meta">Body<br>Inter 500<br>14–15px</div><div style="font-size:15px">Every pack adds new ways to cross something off. Tap any celebration to preview it.</div></div>
+      <div class="specimen"><div class="spec-meta">Tag<br>Press Start 2P<br>6–8px · uppercase</div><div><span class="tag">TODAY</span> &nbsp; <span class="tag" style="background:#00933C;color:#fff">EARNED</span> &nbsp; <span class="tag" style="background:#fff">NOT YET</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="wrap">
+    <p class="eyebrow">Components</p>
+    <h2>Enamel signs with hard shadows.</h2>
+    <div class="grid grid-2" style="margin-top:32px">
+      <div class="comp">
+        <h3>Task rows — idle / swiping / struck</h3>
+        <div class="stack">
+          <div class="row"><span class="idx" style="background:#0039A6">1</span><span class="txt">Call the dentist about Thursday</span></div>
+          <div class="row-wrap"><div class="under">✓&nbsp; DONE</div><div class="row swiping"><span class="idx">2</span><span class="txt">Book the room for Friday</span></div></div>
+          <div class="row struck"><span class="idx" style="background:#00933C">3</span><span class="txt">Water the fig</span></div>
+        </div>
+        <p class="note" style="margin:12px 0 0">The index bullet is the line marker: Express Blue on the first stop, Ink on the rest, Go Green once struck. Strike ink stays Stop Red in both modes.</p>
+      </div>
+      <div class="comp">
+        <h3>Buttons</h3>
+        <div class="stack">
+          <div style="display:flex;gap:12px;flex-wrap:wrap"><span class="btn primary">+ Add stop</span><span class="btn">Preview</span><span class="btn price">$1.99</span><span class="btn danger">Delete</span></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap"><span class="btn primary pressed">+ Add stop</span><span class="btn disabled">+ Add stop</span></div>
+          <div class="toast"><span class="bullet">✓</span><span style="line-height:1.3">New in your Collection <span style="opacity:.6;font-weight:600;white-space:nowrap">· Beat the Clock</span></span></div>
+        </div>
+        <p class="note" style="margin:12px 0 0">Press = the sign drops onto its shadow (translate 3px, shadow 0). No opacity fade, no scale. 80 ms.</p>
+      </div>
+      <div class="comp">
+        <h3>Add bar</h3>
+        <div class="addbar"><div class="field">▸&nbsp; Add one stop…</div><div class="plus">+</div></div>
+      </div>
+      <div class="comp">
+        <h3>Pack card</h3>
+        <div class="pack">
+          <div class="head"><div class="bullet" style="background:#0039A6">G</div><div><b>Game Day</b><small>Every finished task is a touchdown.</small></div></div>
+          <div class="body">Tecmo‑style touchdowns, spikes, interceptions and the halftime band.
+            <div class="chips"><span class="chip">▶ Touchdown</span><span class="chip">▶ Spike</span><span class="chip">▶ Halftime Band</span><span class="chip">+3</span></div>
+            <div class="foot"><small>6 celebrations</small><span class="btn price" style="padding:8px 14px;font-size:14px">$1.99</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp" style="grid-column: 1 / -1">
+        <h3>Collection tiles — earned / previewed / hidden / locked</h3>
+        <div class="tiles" style="max-width:420px">
+          <div class="tile"><div class="ico" style="background:#EE352E">⏱</div><b>Beat the Clock</b><small style="color:#EE352E">×3</small></div>
+          <div class="tile"><div class="ico" style="background:#808183">◎</div><b>Route Cleared</b><small style="color:#808183">PREVIEWED</small></div>
+          <div class="tile hidden"><div class="ico">?</div><b style="color:#8A8A91">???</b><small style="color:#8A8A91">NOT YET</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <p class="eyebrow">Screens</p>
+    <h2>Home, both appearances.</h2>
+    <div class="phones" style="margin-top:32px">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="island"></div><div class="status"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey">TODAY</span><h4>ToDOMax</h4><div class="sub">4 stops remaining</div>
+            <div class="streak"><small>STREAK</small><b>27</b></div></div>
+          <div class="list">
+            <div class="row"><span class="idx" style="background:#0039A6">1</span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="idx">2</span><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="idx">3</span><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="idx" style="background:#00933C">4</span><span class="txt">Water the fig</span></div>
+          </div>
+          <div class="route-strip"><small>DAILY ROUTE · THU</small><div class="sq"><div style="background:#00933C"></div><div style="background:#00933C"></div><div style="background:#FF6319"></div><div style="background:#fff"></div><div style="background:#fff"></div><div style="background:#fff"></div><div style="background:#fff"></div></div></div>
+          <div class="bar"><div class="addbar"><div class="field">▸&nbsp; Add one stop…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Light. Paper background with no map image — the route lives in the Daily Route strip, not behind the list. Cards are enamel signs; the first stop carries Express Blue.</div>
+      </div>
+      <div>
+        <div class="phone dark"><div class="screen">
+          <div class="island"></div><div class="status" style="color:#fff"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey">TODAY</span><h4>ToDOMax</h4><div class="sub">4 stops remaining</div>
+            <div class="streak"><small>STREAK</small><b>27</b></div></div>
+          <div class="list">
+            <div class="row"><span class="idx" style="background:#0039A6;color:#fff">1</span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="idx">2</span><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="idx">3</span><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="idx" style="background:#00933C;color:#fff">4</span><span class="txt" style="color:#8A8A91">Water the fig</span></div>
+          </div>
+          <div class="route-strip"><small>DAILY ROUTE · THU</small><div class="sq"><div style="background:#00933C"></div><div style="background:#00933C"></div><div style="background:#FF6319"></div><div style="background:#000"></div><div style="background:#000"></div><div style="background:#000"></div><div style="background:#000"></div></div></div>
+          <div class="bar"><div class="addbar"><div class="field">▸&nbsp; Add one stop…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Dark. True black, white ink, white hard shadows. Every line color is untouched — the point of signage is that it looks the same at night.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="viral">
+  <div class="wrap">
+    <p class="eyebrow">Viral artifact</p>
+    <h2>The Daily Route card.</h2>
+    <p class="lede">Wordle's lesson: the thing people share should be the <i>synopsis</i> of their day, not a screenshot of the app. One square per task, line‑colored by outcome, no task text — so it's safe to post and legible at thumbnail size.</p>
+    <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;margin-top:32px">
+      <div class="share">
+        <div class="top"><b>ToDOMax</b><small>THU · OCT 2</small></div>
+        <div class="grid-sq">
+          <div style="background:#00933C"></div><div style="background:#00933C"></div><div style="background:#00933C"></div><div style="background:#FF6319"></div><div style="background:#00933C"></div><div style="background:#fff"></div><div style="background:#fff"></div>
+        </div>
+        <div class="legend"><span><i style="background:#00933C"></i>Done 4</span><span><i style="background:#FF6319"></i>Carried 1</span><span><i style="background:#fff"></i>Open 2</span></div>
+        <div class="foot"><span>🔥 27‑day streak</span><span>todomax.app</span></div>
+      </div>
+      <div style="max-width:440px">
+        <h3>How it works</h3>
+        <ul style="font-size:14.5px;padding-left:18px;line-height:1.7">
+          <li><b>Trigger:</b> after the last task of the day is struck, the celebration ends on the card with a single "Share route" button. Not a popup — it's the end of the movie.</li>
+          <li><b>Scarcity:</b> one card per day, generated at the moment you clear the board. Can't be re‑rolled.</li>
+          <li><b>Common knowledge:</b> only people who use ToDOMax can read the colors. That's the point — it's a signal to the in‑group, same as Wordle's grid.</li>
+          <li><b>Streak is on the card</b>, because streaks are about not losing (Mobbin's study of 859 streak designs). A 27 next to the squares is the stake.</li>
+          <li><b>Attribution:</b> a quiet URL in the footer. Loom's 3‑second outro, Calendly's footer — small, permanent, never a watermark.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Motion &amp; feel</p>
+    <h2>Mechanical, not bouncy.</h2>
+    <div class="motion" style="margin-top:28px">
+      <div class="card"><b>Press</b>Sign drops onto its shadow: translate(3,3), shadow → 0. 80 ms, no easing curve to speak of.</div>
+      <div class="card"><b>Strike</b>Keep the pen scribble as‑is. Stop Red, 5px, zero radius ends — a grease pencil, not a marker.</div>
+      <div class="card"><b>Collapse</b>Height collapses with the overdamped spring already shipped; the hard shadow collapses with it.</div>
+      <div class="card"><b>Celebrations</b>Kit animations run unchanged. Their banners already use these colors (bannerRed, bannerYellow). Add a 2px ink border to the banner.</div>
+      <div class="card"><b>Haptics</b>Unchanged: light ticks per stroke, Success on land, selection on arm.</div>
+      <div class="card"><b>Reduce Motion</b>Hard shadows don't move; only the drop. Already compatible.</div>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <p class="eyebrow">Rules</p>
+    <h2>Do / Don't</h2>
+    <div class="dodont" style="margin-top:28px">
+      <div class="card" style="border:2px solid #00933C">
+        <span class="pill" style="background:#00933C;color:#fff">Do</span>
+        <ul>
+          <li>Use Route Yellow for exactly one element per screen.</li>
+          <li>Give every line color a meaning before it appears.</li>
+          <li>Keep borders 2.5px, radius ≤ 6px, shadows hard and offset.</li>
+          <li>Let text do the work — Archivo 900 at 34px+ is the hero image.</li>
+          <li>Use Press Start 2P at 6–8px only, uppercase, inside a bordered tag.</li>
+        </ul>
+      </div>
+      <div class="card" style="border:2px solid #EE352E">
+        <span class="pill" style="background:#EE352E;color:#fff">Don't</span>
+        <ul>
+          <li>No gradients, no blur, no translucency. Signage is opaque.</li>
+          <li>No map image behind the list — the route is the strip, not wallpaper.</li>
+          <li>No soft shadows or rounded‑rect "cards"; a sign is a sign.</li>
+          <li>Don't tint the dark mode grey; it's black.</li>
+          <li>Never put task text on the share card.</li>
+        </ul>
+      </div>
+    </div>
+    <h3 style="margin-top:40px">Mapping to <code class="tok">lib/theme.ts</code></h3>
+    <table class="tokens">
+      <tr><th>Token</th><th>Light</th><th>Dark</th></tr>
+      <tr><td><code>bg</code></td><td>#F6F3EC</td><td>#000000</td></tr>
+      <tr><td><code>surface</code></td><td>#FFFFFF</td><td>#111113</td></tr>
+      <tr><td><code>text</code> / <code>borderStrong</code></td><td>#0B0B0C</td><td>#FFFFFF</td></tr>
+      <tr><td><code>accent</code> (strike)</td><td colspan="2">#EE352E</td></tr>
+      <tr><td><code>gold</code> → rename <code>route</code></td><td colspan="2">#FCCC0A</td></tr>
+      <tr><td><code>green</code></td><td colspan="2">#00933C</td></tr>
+      <tr><td><code>blue</code></td><td colspan="2">#0039A6</td></tr>
+      <tr><td><code>buttonFill</code></td><td>#FCCC0A (ink text)</td><td>#FCCC0A (ink text)</td></tr>
+      <tr><td>shadows</td><td colspan="2">Replace blur shadows with <code>shadowOffset {3,3} · radius 0 · opacity 1</code>; Pack accents become line colors.</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer><div class="wrap">Direction 01 · Signal — ToDOMax design exploration. Companion files: <a href="index.html">Overview</a> · <a href="02-arcade.html">02 Arcade After Dark</a> · <a href="03-softplay.html">03 Soft Play</a></div></footer>
+</body>
+</html>

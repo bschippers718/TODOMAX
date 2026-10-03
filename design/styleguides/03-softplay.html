@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ToDOMax · Direction 03 — Soft Play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="guide-base.css" />
+<style>
+  :root {
+    /* ---- Soft Play tokens ---- */
+    --butter: #FFF6E5;      /* background */
+    --milk: #FFFFFF;        /* cards */
+    --cocoa: #2B2730;       /* text */
+    --cocoa-2: #6E6677;     /* secondary */
+    --cocoa-3: #A89FB0;     /* tertiary */
+    --line: rgba(43, 39, 48, 0.08);
+    --coral: #FF6B57;       /* primary action, strike ink */
+    --coral-deep: #E4523F;
+    --mint: #8FE3B4;        /* done, earned */
+    --mint-deep: #2FA86E;
+    --sky: #9FD3FF;         /* links, price */
+    --sky-deep: #2F8FDB;
+    --peach: #FFC89B;       /* Errand Run */
+    --lilac: #D7C6FF;       /* Checkout */
+    --sun: #FFE27A;         /* streak, Game Day */
+    --sun-deep: #D9A800;
+    --shadow: 0 10px 30px rgba(120, 80, 40, 0.10);
+    --shadow-sm: 0 6px 16px rgba(120, 80, 40, 0.10);
+
+    --sg-paper: var(--butter);
+    --sg-surface: var(--milk);
+    --sg-ink: var(--cocoa);
+    --sg-line: var(--line);
+    --sg-accent: var(--coral-deep);
+    --sg-display: 'Nunito', -apple-system, system-ui, sans-serif;
+    --sg-body: 'Nunito', -apple-system, system-ui, sans-serif;
+    --sg-label: 'Silkscreen', monospace;
+    --sg-eyebrow-size: 11px;
+    --sg-eyebrow-tracking: 0.08em;
+    --sg-display-tracking: -0.02em;
+    --sg-radius-card: 22px;
+  }
+  h1, h2 { font-weight: 900; }
+  h3 { font-weight: 800; }
+  .lede, .note { color: var(--cocoa-2); }
+
+  .hero {
+    background: radial-gradient(800px 420px at 80% 0%, rgba(159,211,255,.45), transparent 60%),
+                radial-gradient(700px 380px at 10% 100%, rgba(255,200,155,.55), transparent 60%),
+                var(--butter);
+    border-bottom: 0;
+    position: relative; overflow: hidden;
+  }
+  .hero .eyebrow { color: var(--coral-deep); }
+  .pxcity { display:flex; align-items:flex-end; gap: 6px; margin-top: 40px; height: 90px; }
+  .pxcity div { width: 34px; border-radius: 6px 6px 2px 2px; position: relative; }
+  .pxcity div::after { content:''; position:absolute; left: 8px; right: 8px; top: 10px; height: 6px; border-radius: 2px; background: rgba(255,255,255,.55); box-shadow: 0 12px 0 rgba(255,255,255,.55), 0 24px 0 rgba(255,255,255,.55); }
+
+  .card { box-shadow: var(--shadow-sm); border-color: var(--line); }
+  .why .card h3 { font-size: 17px; }
+  .why .card p { font-size: 14px; margin: 0; color: var(--cocoa-2); }
+  .why .card .src { display:block; margin-top: 10px; font-size: 12px; color: var(--cocoa-3); }
+
+  .swatch { border-radius: 18px; border-color: var(--line); box-shadow: var(--shadow-sm); }
+  .swatch .meta small { color: var(--cocoa-2); }
+
+  .btn {
+    font-weight: 800; font-size: 15px; padding: 13px 20px; border-radius: 999px;
+    background: var(--milk); color: var(--cocoa); border: 2px solid var(--line);
+    display:inline-flex; align-items:center; gap: 8px; box-shadow: var(--shadow-sm);
+  }
+  .btn.primary { background: var(--coral); color: #fff; border-color: transparent; box-shadow: 0 8px 0 var(--coral-deep), var(--shadow-sm); }
+  .btn.primary.pressed { transform: translateY(6px); box-shadow: 0 2px 0 var(--coral-deep); }
+  .btn.price { background: var(--sky-deep); color: #fff; border-color: transparent; }
+  .btn.soft { background: var(--mint); color: #0F4A2E; border-color: transparent; }
+  .btn.disabled { background: #F1ECE4; color: var(--cocoa-3); box-shadow: none; border-color: transparent; }
+
+  .comp { border: 1px solid var(--line); border-radius: 22px; padding: 18px; background: var(--milk); box-shadow: var(--shadow-sm); }
+  .comp h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--cocoa-3); margin-bottom: 14px; font-weight: 800; }
+  .comp .stack { display:grid; gap: 12px; }
+
+  .row {
+    position: relative; border-radius: 18px; padding: 14px 16px; background: var(--milk);
+    border: 2px solid var(--line); font-weight: 800; font-size: 16px; color: var(--cocoa);
+    box-shadow: var(--shadow-sm); overflow:hidden; display:flex; align-items:center; gap: 12px;
+  }
+  .row .box { width: 26px; height: 26px; border-radius: 9px; border: 2.5px solid var(--cocoa-3); flex-shrink:0; }
+  .row.swiping { transform: translateX(44px); }
+  .row-wrap { position: relative; }
+  .row-wrap .under { position:absolute; inset:0; border-radius: 18px; background: var(--mint); color: #0F4A2E; display:flex; align-items:center; padding-left: 16px; font-weight: 900; }
+  .row.struck .txt { color: var(--cocoa-3); }
+  .row.struck .box { background: var(--mint-deep); border-color: var(--mint-deep); position: relative; }
+  .row.struck .box::after { content:'✓'; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-size: 14px; font-weight: 900; }
+  .row.struck::after { content:''; position:absolute; left: 56px; right: 18px; top: 50%; height: 5px; border-radius: 3px; background: var(--coral); transform: rotate(-2deg); }
+
+  .addbar { display:flex; gap: 10px; align-items:center; }
+  .addbar .field { flex:1; border: 2px solid var(--line); border-radius: 999px; padding: 13px 18px; background: var(--milk); color: var(--cocoa-3); font-weight: 700; box-shadow: var(--shadow-sm); display:flex; align-items:center; gap: 8px; }
+  .addbar .plus { width: 50px; height: 50px; border-radius: 50%; background: var(--coral); color:#fff; display:grid; place-items:center; font-weight: 900; font-size: 24px; box-shadow: 0 6px 0 var(--coral-deep); }
+
+  .pack { border-radius: 22px; background: var(--milk); box-shadow: var(--shadow); overflow:hidden; border: 1px solid var(--line); }
+  .pack .head { display:flex; align-items:center; gap: 12px; padding: 16px 16px 0; }
+  .pack .head .blob { width: 48px; height: 48px; border-radius: 16px; display:grid; place-items:center; font-size: 22px; }
+  .pack .head b { display:block; font-size: 18px; font-weight: 900; }
+  .pack .head small { font-size: 13px; color: var(--cocoa-2); font-weight: 600; }
+  .pack .body { padding: 10px 16px 16px; font-size: 13.5px; color: var(--cocoa-2); font-weight: 600; }
+  .pack .chips { display:flex; flex-wrap:wrap; gap: 6px; margin: 10px 0 14px; }
+  .pack .chip { padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 800; color: var(--cocoa); }
+  .pack .foot { display:flex; justify-content:space-between; align-items:center; }
+  .tag { font-family: var(--sg-label); font-size: 9px; padding: 5px 9px; border-radius: 999px; background: var(--sun); color: #5A4600; }
+
+  .tiles { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tile { border-radius: 20px; background: var(--milk); border: 2px solid var(--line); aspect-ratio: 1 / 1.08; display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 6px; text-align:center; padding: 8px; box-shadow: var(--shadow-sm); }
+  .tile .blob { width: 42px; height: 42px; border-radius: 14px; display:grid; place-items:center; font-size: 20px; }
+  .tile b { font-size: 12px; font-weight: 900; line-height: 1.1; }
+  .tile small { font-family: var(--sg-label); font-size: 8px; color: var(--cocoa-3); }
+  .tile.hidden { border-style: dashed; background: transparent; box-shadow: none; }
+  .tile.locked { opacity: .55; box-shadow: none; }
+
+  /* Phone */
+  .phone { background: #F0E6D8; box-shadow: 0 30px 60px rgba(120,80,40,.25), inset 0 0 0 2px #E2D5C2; }
+  .phone .island { background: #2B2730; }
+  .phone .screen { background: radial-gradient(400px 260px at 100% 0%, rgba(159,211,255,.45), transparent 60%), var(--butter); color: var(--cocoa); }
+  .screen .hdr { padding: 62px 20px 10px; position: relative; }
+  .screen .hdr .ey { font-weight: 900; font-size: 11px; color: var(--coral-deep); letter-spacing: .08em; }
+  .screen .hdr h4 { font-weight: 900; font-size: 32px; letter-spacing: -0.03em; margin: 6px 0 2px; line-height: 1; }
+  .screen .hdr .sub { font-size: 12.5px; color: var(--cocoa-2); font-weight: 700; }
+  .screen .hdr .streak { position:absolute; right: 18px; top: 64px; background: var(--sun); border-radius: 16px; padding: 8px 12px; text-align:center; box-shadow: 0 4px 0 var(--sun-deep); }
+  .screen .hdr .streak small { display:block; font-family: var(--sg-label); font-size: 7px; color: #5A4600; }
+  .screen .hdr .streak b { font-size: 18px; font-weight: 900; color: #3D2F00; }
+  .screen .block { margin: 6px 16px 10px; height: 84px; border-radius: 18px; background: var(--milk); border: 2px solid var(--line); position: relative; overflow:hidden; box-shadow: var(--shadow-sm); }
+  .screen .block .ground { position:absolute; left:0; right:0; bottom:0; height: 14px; background: var(--mint); }
+  .screen .block .bld { position:absolute; bottom: 14px; border-radius: 4px 4px 0 0; }
+  .screen .block .lbl { position:absolute; top: 8px; left: 12px; font-family: var(--sg-label); font-size: 8px; color: var(--cocoa-3); }
+  .screen .list { padding: 0 16px; display:grid; gap: 10px; }
+  .screen .row { font-size: 14px; padding: 12px 14px; }
+  .screen .bar { position:absolute; left:0; right:0; bottom:0; padding: 12px 16px 30px; background: linear-gradient(180deg, transparent, var(--butter) 40%); }
+  .screen .bar .addbar .field { font-size: 13px; padding: 11px 14px; }
+  .screen .bar .addbar .plus { width: 44px; height: 44px; }
+
+  .phone.dark { background: #221F27; box-shadow: 0 30px 60px rgba(0,0,0,.5), inset 0 0 0 2px #3a3542; }
+  .phone.dark .screen { background: radial-gradient(400px 260px at 100% 0%, rgba(159,211,255,.14), transparent 60%), #1C1920; color: #F6F0F7; }
+  .phone.dark .row { background: #2A2630; border-color: rgba(255,255,255,.06); color: #F6F0F7; box-shadow: none; }
+  .phone.dark .row .box { border-color: #6E6677; }
+  .phone.dark .hdr .sub { color: #B4AABC; }
+  .phone.dark .block { background: #2A2630; border-color: rgba(255,255,255,.06); box-shadow:none; }
+  .phone.dark .bar { background: linear-gradient(180deg, transparent, #1C1920 40%); }
+  .phone.dark .addbar .field { background: #2A2630; border-color: rgba(255,255,255,.06); color: #8C8394; box-shadow:none; }
+  .phone.dark .row.struck .txt { color: #6E6677; }
+
+  /* Postcard */
+  .share { width: 340px; border-radius: 24px; background: var(--milk); box-shadow: var(--shadow); overflow:hidden; border: 1px solid var(--line); }
+  .share .sky { height: 170px; background: linear-gradient(180deg, #9FD3FF, #DDEFFF); position: relative; }
+  .share .sky .sun { position:absolute; top: 18px; right: 22px; width: 36px; height: 36px; border-radius: 50%; background: var(--sun); box-shadow: 0 0 0 8px rgba(255,226,122,.35); }
+  .share .sky .bld { position:absolute; bottom: 0; border-radius: 4px 4px 0 0; }
+  .share .sky .ground { position:absolute; left:0; right:0; bottom:0; height: 16px; background: var(--mint); }
+  .share .txt { padding: 16px 18px 18px; }
+  .share .txt b { font-size: 20px; font-weight: 900; display:block; letter-spacing: -0.02em; }
+  .share .txt small { color: var(--cocoa-2); font-weight: 700; font-size: 13px; }
+  .share .txt .foot { margin-top: 12px; display:flex; justify-content:space-between; font-size: 12px; color: var(--cocoa-3); font-weight: 700; }
+
+  .toast { display:inline-flex; align-items:center; gap: 10px; background: var(--milk); border: 2px solid var(--line); padding: 10px 16px 10px 10px; border-radius: 999px; font-weight: 800; font-size: 14px; box-shadow: var(--shadow-sm); }
+  .toast .blob { width: 28px; height: 28px; border-radius: 10px; background: var(--mint); display:grid; place-items:center; font-weight: 900; color: #0F4A2E; }
+
+  .motion { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; }
+  .motion .card { font-size: 13.5px; color: var(--cocoa-2); }
+  .motion .card b { display:block; color: var(--cocoa); font-size: 15px; margin-bottom: 4px; }
+  .dodont .card ul { color: var(--cocoa-2); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumb"><span>ToDOMax style guides /</span> 03 · Soft Play</div>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="#why">Why</a>
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#components">Components</a>
+    <a href="#screens">Screens</a>
+    <a href="#viral">Viral artifact</a>
+    <a href="#rules">Rules</a>
+  </nav>
+</div>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Direction 03</p>
+    <h1>Soft Play.</h1>
+    <p class="lede">Pixel art, but the kind you want to hug. Butter backgrounds, rounded everything, candy accents — and a little pixel block that builds itself up as you finish things. The mass‑market direction: friendly enough for your mum, playful enough to screenshot.</p>
+    <div class="pxcity">
+      <div style="height:48px;background:#FFC89B"></div><div style="height:72px;background:#D7C6FF"></div><div style="height:60px;background:#9FD3FF"></div><div style="height:88px;background:#FF6B57"></div><div style="height:40px;background:#8FE3B4"></div><div style="height:66px;background:#FFE27A"></div><div style="height:54px;background:#FFC89B"></div>
+    </div>
+  </div>
+</section>
+
+<section id="why" class="why">
+  <div class="wrap">
+    <p class="eyebrow">Why this direction</p>
+    <h2>The apps that stuck gave you something to take care of.</h2>
+    <p class="lede">Streaks are about not losing. Finch and Duolingo both learned that a number is easy to abandon, but a <i>thing</i> you've been raising isn't. Soft Play gives ToDOMax a thing: your block — a row of pixel buildings that grows one storey per task.</p>
+    <div class="grid grid-3" style="margin-top:32px">
+      <div class="card">
+        <h3>Finch: progress you can see grow</h3>
+        <p>"Instead of tracking your habits, you're raising something." Finch's bird grows when you show up and doesn't when you don't — and a missed day shows a <b>repair hammer</b>, not a blank. Soft Play's block does the same: a storey is added per task, and a quiet day shows scaffolding you can still finish.</p>
+        <small class="src">mobbin.com — 859 streak designs</small>
+      </div>
+      <div class="card">
+        <h3>Duolingo: "Commit to my goal"</h3>
+        <p>Changing one button from <i>Continue</i> to <i>Commit to my goal</i> brought 10,000 more people back daily. Soft Play's copy is first‑person and warm: "Add one thing", "Done for today", "Keep my street lit". The product talks like a friend, not a system.</p>
+        <small class="src">blog.duolingo.com · mobbin.com</small>
+      </div>
+      <div class="card">
+        <h3>Headspace: calm sells</h3>
+        <p>Headspace's muted oranges and soft blues deliberately avoid sharp contrast. Productivity apps skew anxious; the one that <i>doesn't</i> is the one people recommend. Soft Play keeps saturation high but tone warm — candy, not neon.</p>
+        <small class="src">uxpin.com — app color psychology (2026)</small>
+      </div>
+    </div>
+    <p class="note" style="margin-top:28px">Risk to name honestly: this is the most crowded aesthetic (Finch, Habitica, Forest, Streaks). The differentiator has to be the pixel block + the kit's cinematic celebrations — nobody in this space has a 3‑second pixel movie when you finish a task.</p>
+  </div>
+</section>
+
+<section id="color">
+  <div class="wrap">
+    <p class="eyebrow">Color</p>
+    <h2>Butter, cocoa, and five candies.</h2>
+    <h3 style="margin-top:36px">Base</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FFF6E5">#FFF6E5</div><div class="meta"><b>Butter</b><small>Screen background. Warm, bright.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF">#FFFFFF</div><div class="meta"><b>Milk</b><small>Cards, inputs.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#2B2730;color:#fff">#2B2730</div><div class="meta"><b>Cocoa</b><small>Text. A warm charcoal — never pure black.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#6E6677;color:#fff">#6E6677</div><div class="meta"><b>Cocoa 2</b><small>Secondary text.</small></div></div>
+    </div>
+    <h3 style="margin-top:36px">Candies</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FF6B57;color:#fff">#FF6B57</div><div class="meta"><b>Coral</b><small>Primary action and strike ink. Deep: #E4523F for the 3D edge.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#8FE3B4;color:#0F4A2E">#8FE3B4</div><div class="meta"><b>Mint</b><small>Done, earned, ground. Deep: #2FA86E.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#9FD3FF;color:#073A66">#9FD3FF</div><div class="meta"><b>Sky</b><small>Links, price (deep #2F8FDB), hero wash.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFE27A;color:#5A4600">#FFE27A</div><div class="meta"><b>Sun</b><small>Streak badge, TODAY, Game Day. Deep: #D9A800.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFC89B;color:#5A2E00">#FFC89B</div><div class="meta"><b>Peach</b><small>Errand Run pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#D7C6FF;color:#2E1A66">#D7C6FF</div><div class="meta"><b>Lilac</b><small>Checkout pack.</small></div></div>
+    </div>
+    <table class="tokens" style="margin-top:36px">
+      <tr><th>Context</th><th>Pair</th><th>Contrast</th></tr>
+      <tr><td>Body text</td><td>Cocoa on Butter</td><td>13.9 : 1</td></tr>
+      <tr><td>Primary button</td><td>White on Coral</td><td>3.3 : 1 — large/bold text only (≥ 15px 800)</td></tr>
+      <tr><td>Price capsule</td><td>White on Sky Deep</td><td>4.6 : 1</td></tr>
+      <tr><td>Mint label</td><td>#0F4A2E on Mint</td><td>8.9 : 1</td></tr>
+      <tr><td>Dark mode</td><td>#F6F0F7 on #1C1920 · candies unchanged, "deep" edges lightened 10%</td><td>15.2 : 1</td></tr>
+    </table>
+    <p class="note">Every candy has a "deep" partner used as a 4–8px bottom edge on buttons and badges — the chunky, pressable look (Duolingo's buttons work this way). The pastel is the face; the deep is the side.</p>
+  </div>
+</section>
+
+<section id="type">
+  <div class="wrap">
+    <p class="eyebrow">Typography</p>
+    <h2>Round and heavy, with a pixel wink.</h2>
+    <p class="lede">Nunito at 800–900 everywhere. One family keeps it simple and friendly; the weight keeps it from going twee. Silkscreen — a cleaner, rounder bitmap than Press Start — only for 7–9px labels and the pixel block's captions.</p>
+    <div style="margin-top:28px">
+      <div class="specimen"><div class="spec-meta">Display<br>Nunito 900<br>32–72px · −0.03em</div><div style="font-weight:900;font-size:56px;letter-spacing:-0.03em;line-height:1">Done for today.</div></div>
+      <div class="specimen"><div class="spec-meta">Task<br>Nunito 800<br>16px</div><div style="font-weight:800;font-size:18px">Pick up dry cleaning on 7th Ave</div></div>
+      <div class="specimen"><div class="spec-meta">Body<br>Nunito 600/700<br>14–15px</div><div style="font-size:15px;font-weight:600;color:var(--cocoa-2)">Every pack adds new ways to cross something off. Tap any celebration to preview it.</div></div>
+      <div class="specimen"><div class="spec-meta">Pixel label<br>Silkscreen<br>7–9px</div><div><span class="tag">TODAY</span> &nbsp; <span class="tag" style="background:var(--mint);color:#0F4A2E">EARNED</span> &nbsp; <span class="tag" style="background:#F1ECE4;color:var(--cocoa-2)">NOT YET</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="wrap">
+    <p class="eyebrow">Components</p>
+    <h2>Chunky, rounded, pressable.</h2>
+    <div class="grid grid-2" style="margin-top:32px">
+      <div class="comp">
+        <h3>Task rows — idle / swiping / struck</h3>
+        <div class="stack">
+          <div class="row"><span class="box"></span><span class="txt">Call the dentist about Thursday</span></div>
+          <div class="row-wrap"><div class="under">✓&nbsp; Nice!</div><div class="row swiping"><span class="box"></span><span class="txt">Book the room for Friday</span></div></div>
+          <div class="row struck"><span class="box"></span><span class="txt">Water the fig</span></div>
+        </div>
+        <p class="note" style="margin:12px 0 0">A visible checkbox returns — this direction is for people who want the familiar affordance. Swipe still works; the box just fills Mint when the pen lands.</p>
+      </div>
+      <div class="comp">
+        <h3>Buttons</h3>
+        <div class="stack">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start"><span class="btn primary">+ Add one thing</span><span class="btn">Preview</span><span class="btn price">$1.99</span><span class="btn soft">Done for today</span></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-top:6px"><span class="btn primary pressed">+ Add one thing</span><span class="btn disabled">+ Add one thing</span></div>
+          <div class="toast"><span class="blob">✓</span><span style="line-height:1.3">New in your Collection <span style="color:var(--cocoa-2);white-space:nowrap">· Beat the Clock</span></span></div>
+        </div>
+        <p class="note" style="margin:12px 0 0">Primary buttons have an 8px "deep" edge and press down 6px — the physical, Duolingo‑style button. Haptic: selection on press, Success on release.</p>
+      </div>
+      <div class="comp">
+        <h3>Add bar</h3>
+        <div class="addbar"><div class="field">✦&nbsp; Add one thing…</div><div class="plus">+</div></div>
+      </div>
+      <div class="comp">
+        <h3>Pack card</h3>
+        <div class="pack">
+          <div class="head"><div class="blob" style="background:var(--sun)">🏈</div><div><b>Game Day</b><small>Every finished task is a touchdown.</small></div></div>
+          <div class="body">Touchdowns, spikes, interceptions and the halftime band.
+            <div class="chips"><span class="chip" style="background:#FFF1BF">▶ Touchdown</span><span class="chip" style="background:#FFF1BF">▶ Spike</span><span class="chip" style="background:#FFF1BF">▶ Halftime Band</span><span class="chip" style="background:#F1ECE4;color:var(--cocoa-2)">+3</span></div>
+            <div class="foot"><small style="font-weight:800">6 celebrations</small><span class="btn price" style="padding:9px 18px;font-size:14px">$1.99</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp" style="grid-column:1/-1">
+        <h3>Collection tiles — earned / previewed / hidden / locked</h3>
+        <div class="tiles" style="max-width:420px">
+          <div class="tile" style="border-color:var(--peach)"><div class="blob" style="background:var(--peach)">⏱</div><b>Beat the Clock</b><small style="color:#B8651E">×3</small></div>
+          <div class="tile"><div class="blob" style="background:#F1ECE4">◎</div><b>Route Cleared</b><small>PREVIEWED</small></div>
+          <div class="tile hidden"><div class="blob" style="background:transparent;border:2px dashed var(--cocoa-3);color:var(--cocoa-3)">?</div><b style="color:var(--cocoa-3)">???</b><small>NOT YET</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <p class="eyebrow">Screens</p>
+    <h2>Home, with your block up top.</h2>
+    <div class="phones" style="margin-top:32px">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="island"></div><div class="status"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey">TODAY</span><h4>ToDOMax</h4><div class="sub">4 things to go · 2 done</div>
+            <div class="streak"><small>STREAK</small><b>27</b></div></div>
+          <div class="block"><span class="lbl">YOUR BLOCK · OCT</span><div class="ground"></div>
+            <div class="bld" style="left:14px;width:26px;height:30px;background:#FFC89B"></div>
+            <div class="bld" style="left:46px;width:26px;height:48px;background:#D7C6FF"></div>
+            <div class="bld" style="left:78px;width:26px;height:22px;background:#9FD3FF"></div>
+            <div class="bld" style="left:110px;width:26px;height:56px;background:#FF6B57"></div>
+            <div class="bld" style="left:142px;width:26px;height:14px;background:#FFE27A"></div>
+            <div class="bld" style="left:174px;width:26px;height:40px;background:#8FE3B4"></div>
+            <div class="bld" style="left:206px;width:26px;height:10px;background:#F1ECE4;border:2px dashed #C9C0B2;border-bottom:0"></div>
+          </div>
+          <div class="list">
+            <div class="row"><span class="box"></span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="box"></span><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="box"></span><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="box"></span><span class="txt">Water the fig</span></div>
+          </div>
+          <div class="bar"><div class="addbar"><div class="field">✦&nbsp; Add one thing…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Light. The pixel map wallpaper is replaced by <b>your block</b>: one building per day this month, one storey per task. Today's building is the dashed one — it's scaffolding until you finish something.</div>
+      </div>
+      <div>
+        <div class="phone dark"><div class="screen">
+          <div class="island"></div><div class="status" style="color:#F6F0F7"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey" style="color:#FF8A78">TODAY</span><h4>ToDOMax</h4><div class="sub">4 things to go · 2 done</div>
+            <div class="streak"><small>STREAK</small><b>27</b></div></div>
+          <div class="block"><span class="lbl">YOUR BLOCK · OCT</span><div class="ground" style="background:#2FA86E"></div>
+            <div class="bld" style="left:14px;width:26px;height:30px;background:#FFC89B"></div>
+            <div class="bld" style="left:46px;width:26px;height:48px;background:#D7C6FF"></div>
+            <div class="bld" style="left:78px;width:26px;height:22px;background:#9FD3FF"></div>
+            <div class="bld" style="left:110px;width:26px;height:56px;background:#FF6B57"></div>
+            <div class="bld" style="left:142px;width:26px;height:14px;background:#FFE27A"></div>
+            <div class="bld" style="left:174px;width:26px;height:40px;background:#8FE3B4"></div>
+            <div class="bld" style="left:206px;width:26px;height:10px;background:transparent;border:2px dashed #6E6677;border-bottom:0"></div>
+          </div>
+          <div class="list">
+            <div class="row"><span class="box"></span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="box"></span><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="box"></span><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="box"></span><span class="txt">Water the fig</span></div>
+          </div>
+          <div class="bar"><div class="addbar"><div class="field">✦&nbsp; Add one thing…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Dark. A warm, plum‑tinted charcoal rather than blue‑black; candies stay bright because they're the point. Night in the city, lights on.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="viral">
+  <div class="wrap">
+    <p class="eyebrow">Viral artifact</p>
+    <h2>The postcard.</h2>
+    <p class="lede">At the end of each week (or month) your block becomes a postcard: the skyline you built, the streak, no task text. It's the Finch bird photo, the Duolingo year‑in‑review, the thing people post because it's <i>theirs</i>.</p>
+    <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;margin-top:32px">
+      <div class="share">
+        <div class="sky"><div class="sun"></div>
+          <div class="bld" style="left:18px;width:30px;height:60px;background:#FFC89B"></div>
+          <div class="bld" style="left:54px;width:30px;height:98px;background:#D7C6FF"></div>
+          <div class="bld" style="left:90px;width:30px;height:44px;background:#9FD3FF"></div>
+          <div class="bld" style="left:126px;width:30px;height:118px;background:#FF6B57"></div>
+          <div class="bld" style="left:162px;width:30px;height:30px;background:#FFE27A"></div>
+          <div class="bld" style="left:198px;width:30px;height:84px;background:#8FE3B4"></div>
+          <div class="bld" style="left:234px;width:30px;height:70px;background:#FFC89B"></div>
+          <div class="bld" style="left:270px;width:30px;height:50px;background:#D7C6FF"></div>
+          <div class="ground"></div>
+        </div>
+        <div class="txt"><b>Ben's block · Week 40</b><small>23 things finished · 7 buildings · 27‑day streak 🔥</small>
+          <div class="foot"><span>Greetings from ToDOMax</span><span>todomax.app</span></div></div>
+      </div>
+      <div style="max-width:440px">
+        <h3>How it works</h3>
+        <ul style="font-size:14.5px;padding-left:18px;line-height:1.7;color:var(--cocoa-2);font-weight:600">
+          <li><b style="color:var(--cocoa)">Generated, not screenshotted.</b> The postcard is rendered from your week's data — tall buildings on big days, scaffolding on quiet ones. Every one is different.</li>
+          <li><b style="color:var(--cocoa)">Identity:</b> "Ben's block." The research is blunt — people share things that are about <i>them</i>. The skyline is a portrait.</li>
+          <li><b style="color:var(--cocoa)">Repair, don't punish.</b> A missed day is a dashed building you can still complete tomorrow (Finch's hammer). The streak never resets to zero mid‑week; it pauses.</li>
+          <li><b style="color:var(--cocoa)">Friend streets:</b> add a friend and your blocks sit side by side — the 22% friend‑streak lift, without a leaderboard.</li>
+          <li><b style="color:var(--cocoa)">Packs show up on the skyline.</b> Earn a Game Day celebration and a stadium appears; Garage adds a gas station. The store becomes world‑building.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Motion &amp; feel</p>
+    <h2>Squishy, warm, quick.</h2>
+    <div class="motion" style="margin-top:28px">
+      <div class="card"><b>Press</b>Buttons depress 6px onto their deep edge and spring back (damping 14, stiffness 320). Scale stays 1.</div>
+      <div class="card"><b>Strike</b>Existing scribble in Coral, slightly thicker (5px, round caps). The checkbox fills Mint and pops to 1.15 on land.</div>
+      <div class="card"><b>Block grows</b>After the celebration, today's building gains a storey with a 180 ms overshoot spring. This is the second payoff — tiny, every time.</div>
+      <div class="card"><b>Celebrations</b>Kit scenes unchanged; overlay backdrop is Butter at 60% instead of ink, so the movie feels like a daydream rather than a cut to black.</div>
+      <div class="card"><b>Sound</b>Keep the kit sounds; consider a soft "plink" for the storey landing.</div>
+      <div class="card"><b>Reduce Motion</b>Buttons don't depress; the block updates without spring. Already supported by the current hook.</div>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <p class="eyebrow">Rules</p>
+    <h2>Do / Don't</h2>
+    <div class="dodont" style="margin-top:28px">
+      <div class="card" style="border:2px solid var(--mint)">
+        <span class="pill" style="background:var(--mint);color:#0F4A2E">Do</span>
+        <ul>
+          <li>Pair every candy with its deep edge; the pastel alone looks flat.</li>
+          <li>Keep radius ≥ 18px on cards, 999 on buttons and inputs.</li>
+          <li>Write copy in first person and present tense — "Add one thing", "Done for today".</li>
+          <li>Let the block be the only illustration on the home screen.</li>
+          <li>Use Silkscreen for ≤ 9px labels only.</li>
+        </ul>
+      </div>
+      <div class="card" style="border:2px solid var(--coral)">
+        <span class="pill" style="background:var(--coral);color:#fff">Don't</span>
+        <ul>
+          <li>No gradients on controls — only on the hero wash and postcard sky.</li>
+          <li>No pure black, no grey text below 4.5 : 1 for body copy.</li>
+          <li>Don't add a mascot character. The block is the companion; a bird would make it Finch.</li>
+          <li>Don't reset the streak to zero mid‑week. Pause it.</li>
+          <li>No more than two candies per component.</li>
+        </ul>
+      </div>
+    </div>
+    <h3 style="margin-top:40px">Mapping to <code class="tok">lib/theme.ts</code></h3>
+    <table class="tokens">
+      <tr><th>Token</th><th>Light</th><th>Dark</th></tr>
+      <tr><td><code>bg</code></td><td>#FFF6E5</td><td>#1C1920</td></tr>
+      <tr><td><code>surface</code></td><td>#FFFFFF</td><td>#2A2630</td></tr>
+      <tr><td><code>text</code> / <code>textSecondary</code></td><td>#2B2730 / #6E6677</td><td>#F6F0F7 / #B4AABC</td></tr>
+      <tr><td><code>accent</code> (strike, primary)</td><td colspan="2">#FF6B57 · deep #E4523F</td></tr>
+      <tr><td><code>green</code></td><td colspan="2">#8FE3B4 face · #2FA86E deep/text</td></tr>
+      <tr><td><code>blue</code></td><td colspan="2">#2F8FDB (capsules) · #9FD3FF (washes)</td></tr>
+      <tr><td><code>gold</code> → <code>sun</code></td><td colspan="2">#FFE27A · deep #D9A800</td></tr>
+      <tr><td>new: <code>deepEdge</code></td><td colspan="2">Rendered as a sibling View 6–8px tall behind the button; press = translateY(6).</td></tr>
+      <tr><td>AppBackground</td><td colspan="2">Replace the map JPG with a radial Sky wash + the Block component (data‑driven from completions).</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer><div class="wrap">Direction 03 · Soft Play — ToDOMax design exploration. Companion files: <a href="index.html">Overview</a> · <a href="01-signal.html">01 Signal</a> · <a href="02-arcade.html">02 Arcade After Dark</a></div></footer>
+</body>
+</html>

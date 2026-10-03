@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# raw animation source videos (too large for GitHub; keep locally)
+/Animation Kit/
+/Animation Kit.zip

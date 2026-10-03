@@ -1,8 +1,17 @@
-import { useRef, useCallback } from 'react';
-import { Text, View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { useRef, useCallback, useState, memo } from 'react';
+import {
+  Text,
+  View,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  LayoutChangeEvent,
+  AccessibilityActionEvent,
+} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedReaction,
   withTiming,
   withSequence,
   withDelay,
@@ -11,122 +20,309 @@ import Animated, {
   interpolate,
   Extrapolation,
   Easing,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { Task, COLORS, Settings } from '../lib/types';
+import { Task, Settings } from '../lib/types';
+import { useTheme, IOS_SPRING } from '../lib/theme';
+import { Symbol } from './ui/Symbol';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.35;
-const CARD_HEIGHT = 58;
-const SCRIBBLE_WIDTH = SCREEN_WIDTH * 0.65;
 const SCRIBBLE_VARIANTS = ['doubleSlash', 'zigzag', 'markerLoop', 'pixelX'] as const;
+
+// How much of the scribble the finger can draw before release. The remainder is
+// finished by the "pen" on release so there's always a satisfying final flick.
+const DRAG_MAX = 0.86;
+// Past the threshold the card resists, like pulling against a rubber band.
+const OVERDRAG_RESISTANCE = 0.22;
+// Pause between the strike landing and the card crumpling away.
+const HOLD_AFTER_STRIKE = 340;
+const CARD_MARGIN = 4;
+
+// Each stroke owns a slice of the 0..1 strike progress. Slices overlap slightly so the
+// next stroke starts as the previous one finishes — one continuous scribble, no pen lift.
+const STROKE_1: [number, number] = [0.0, 0.42];
+const STROKE_2: [number, number] = [0.3, 0.72];
+const STROKE_3: [number, number] = [0.58, 1.0];
+
+const SPRING_BACK = { damping: 20, stiffness: 260, mass: 0.7 };
+// Overdamped so a height collapse never overshoots into negative space.
+const SPRING_COLLAPSE = { damping: 26, stiffness: 240, mass: 0.9, overshootClamping: true };
 
 type ScribbleVariant = (typeof SCRIBBLE_VARIANTS)[number];
 
 interface TaskItemProps {
   task: Task;
   settings: Settings;
+  reduceMotion?: boolean;
+  /** Fired the instant the scribble lands (sound/haptics belong here). */
+  onStrike?: (id: string) => void;
+  /** Fired after the card has fully collapsed and can be removed from the list. */
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit?: (id: string, text: string) => void;
 }
 
-export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps) {
-  const translateX = useSharedValue(0);
-  const cardHeight = useSharedValue(CARD_HEIGHT);
-  const cardOpacity = useSharedValue(1);
-  const cardMargin = useSharedValue(4);
-  const isCompleting = useRef(false);
-  const scribbleVariant = useRef(getScribbleVariant(task.id)).current;
+/**
+ * A pen stroke that draws along its own axis as `strike` moves through [start, end].
+ * Uses scaleX from the left edge (GPU transform) rather than animating `width` (layout).
+ */
+function useStrokeStyle(
+  strike: SharedValue<number>,
+  [start, end]: [number, number],
+  rotateDeg: number,
+) {
+  return useAnimatedStyle(() => {
+    const p = interpolate(strike.value, [start, end], [0, 1], Extrapolation.CLAMP);
+    // Pen lands light and loads up over the first ~30% of the stroke.
+    const pressure = 0.55 + 0.45 * Math.min(1, p * 3.2);
+    return {
+      opacity: p > 0.002 ? 1 : 0,
+      // Rotate first so the scale runs along the stroke's own axis.
+      transform: [{ rotate: `${rotateDeg}deg` }, { scaleX: p }, { scaleY: pressure }],
+    };
+  });
+}
 
-  const strike1Progress = useSharedValue(0);
-  const strike2Progress = useSharedValue(0);
-  const strike3Progress = useSharedValue(0);
-  const strikeGlow = useSharedValue(0);
-  const shakeX = useSharedValue(0);
+// Per-variant stroke angles (degrees). Kept here because the animated transform
+// replaces any static transform on the view.
+const ANGLES: Record<ScribbleVariant, [number, number, number]> = {
+  doubleSlash: [5, -7, 1],
+  zigzag: [14, -15, 11],
+  markerLoop: [-4, -7, 5],
+  pixelX: [10, -10, 0],
+};
+
+function TaskItemInner({
+  task,
+  settings,
+  reduceMotion = false,
+  onStrike,
+  onComplete,
+  onDelete,
+  onEdit,
+}: TaskItemProps) {
+  const theme = useTheme();
+  const { width: SW } = useWindowDimensions();
+  const SWIPE_THRESHOLD = SW * 0.35;
+  const DELETE_THRESHOLD = SW * 0.3;
+  const SCRIBBLE_WIDTH = SW * 0.65;
+
+  const translateX = useSharedValue(0);
+  const strike = useSharedValue(0);
+  const committed = useSharedValue(false);
+
+  // Height comes from content (Dynamic Type friendly); we only pin it while collapsing.
+  const measuredHeight = useSharedValue(0);
+  const collapse = useSharedValue(0);
+  const collapsing = useSharedValue(false);
+  const cardOpacity = useSharedValue(1);
   const cardScale = useSharedValue(1);
+  const cardRotate = useSharedValue(0);
+  const shakeX = useSharedValue(0);
+  const strikeGlow = useSharedValue(0);
   const splatOpacity = useSharedValue(0);
   const textOpacity = useSharedValue(1);
 
-  const triggerComplete = useCallback(() => {
-    if (isCompleting.current) return;
-    isCompleting.current = true;
-    onComplete(task.id);
-  }, [task.id, onComplete]);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.text);
+  const inputRef = useRef<TextInput>(null);
 
-  const fireHeavyHaptic = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-  }, []);
+  const scribbleVariant = useRef(getScribbleVariant(task.id)).current;
+  const hapticsEnabled = settings.hapticsEnabled;
+
+  const fireComplete = useCallback(() => onComplete(task.id), [task.id, onComplete]);
+  const fireDelete = useCallback(() => onDelete(task.id), [task.id, onDelete]);
+  const fireStrike = useCallback(() => {
+    // The "it's done" moment is a success notification, not a thud.
+    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onStrike?.(task.id);
+  }, [task.id, onStrike, hapticsEnabled]);
+  const fireTick = useCallback(() => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [hapticsEnabled]);
+  const fireDeleteHaptic = useCallback(() => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [hapticsEnabled]);
+  const fireArm = useCallback(() => {
+    if (hapticsEnabled) Haptics.selectionAsync();
+  }, [hapticsEnabled]);
+
+  const beginEdit = useCallback(() => {
+    if (!onEdit) return;
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setDraft(task.text);
+    setEditing(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [onEdit, hapticsEnabled, task.text]);
+
+  const commitEdit = useCallback(() => {
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (trimmed && trimmed !== task.text) onEdit?.(task.id, trimmed);
+  }, [draft, task.id, task.text, onEdit]);
+
+  // Little haptic ticks as each pen stroke lands under the finger, and a
+  // selection click when the delete side arms.
+  useAnimatedReaction(
+    () => ({ s: strike.value, x: translateX.value }),
+    (cur, prev) => {
+      if (prev === null || committed.value) return;
+      const crossed = (t: number) => prev.s < t && cur.s >= t;
+      if (crossed(STROKE_1[1]) || crossed(STROKE_2[1])) {
+        runOnJS(fireTick)();
+      }
+      if (prev.x > -DELETE_THRESHOLD && cur.x <= -DELETE_THRESHOLD) {
+        runOnJS(fireArm)();
+      }
+    },
+    [fireTick, fireArm, DELETE_THRESHOLD],
+  );
+
+  const collapseOut = (delay: number, done: () => void) => {
+    'worklet';
+    collapsing.value = true;
+    cardOpacity.value = withDelay(delay, withTiming(0, { duration: 180 }));
+    collapse.value = withDelay(
+      delay,
+      withSpring(1, SPRING_COLLAPSE, (finished) => {
+        if (finished) runOnJS(done)();
+      }),
+    );
+  };
+
+  const land = () => {
+    'worklet';
+    runOnJS(fireStrike)();
+    textOpacity.value = withTiming(0.3, { duration: 220 });
+
+    if (reduceMotion) {
+      // Honour Reduce Motion: ink lands, card fades and folds. No shake, no flash.
+      collapseOut(HOLD_AFTER_STRIKE, fireComplete);
+      return;
+    }
+
+    // Impact: the card jolts as the pen slams down on the last stroke.
+    shakeX.value = withSequence(
+      withTiming(5, { duration: 28 }),
+      withTiming(-5, { duration: 28 }),
+      withTiming(3, { duration: 24 }),
+      withTiming(-1.5, { duration: 22 }),
+      withTiming(0, { duration: 18 }),
+    );
+    strikeGlow.value = withSequence(
+      withTiming(1, { duration: 70 }),
+      withTiming(0.35, { duration: 320 }),
+    );
+    splatOpacity.value = withSequence(
+      withTiming(0.75, { duration: 50 }),
+      withTiming(0.45, { duration: 380 }),
+    );
+
+    // Crumple on a spring, then collapse and hand off to the list.
+    cardScale.value = withDelay(
+      HOLD_AFTER_STRIKE,
+      withSequence(
+        withSpring(1.025, { damping: 14, stiffness: 420, mass: 0.6 }),
+        withSpring(0.88, { damping: 20, stiffness: 300, mass: 0.8 }),
+      ),
+    );
+    cardRotate.value = withDelay(
+      HOLD_AFTER_STRIKE + 70,
+      withSpring(-1.6, { damping: 18, stiffness: 260, mass: 0.8 }),
+    );
+    collapseOut(HOLD_AFTER_STRIKE + 170, fireComplete);
+  };
+
+  const flingOutAndDelete = () => {
+    'worklet';
+    runOnJS(fireDeleteHaptic)();
+    translateX.value = withTiming(-SW, {
+      duration: reduceMotion ? 160 : 240,
+      easing: Easing.in(Easing.cubic),
+    });
+    collapseOut(reduceMotion ? 100 : 160, fireDelete);
+  };
 
   const panGesture = Gesture.Pan()
-    .activeOffsetX(10)
+    .enabled(!editing)
+    .activeOffsetX([-10, 10])
     .failOffsetY([-10, 10])
     .onUpdate((e) => {
-      if (e.translationX > 0) {
-        translateX.value = e.translationX;
+      if (committed.value) return;
+      const dx = e.translationX;
+      if (dx >= 0) {
+        const over = Math.max(0, dx - SWIPE_THRESHOLD);
+        translateX.value = Math.min(dx, SWIPE_THRESHOLD) + over * OVERDRAG_RESISTANCE;
+        strike.value = Math.min(dx / SWIPE_THRESHOLD, 1) * DRAG_MAX;
+      } else {
+        const adx = -dx;
+        const over = Math.max(0, adx - DELETE_THRESHOLD);
+        translateX.value = -(Math.min(adx, DELETE_THRESHOLD) + over * OVERDRAG_RESISTANCE);
+        strike.value = 0;
       }
     })
     .onEnd((e) => {
+      if (committed.value) return;
+
       if (e.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withTiming(0, { duration: 120 });
-
-        if (settings.hapticsEnabled) {
-          runOnJS(fireHeavyHaptic)();
-        }
-
-        strike1Progress.value = withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) });
-        strike2Progress.value = withDelay(90, withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) }));
-        strike3Progress.value = withDelay(170, withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }));
-
-        // Shake
-        shakeX.value = withSequence(
-          withTiming(6, { duration: 25 }),
-          withTiming(-6, { duration: 25 }),
-          withTiming(4, { duration: 20 }),
-          withTiming(-2, { duration: 20 }),
-          withTiming(0, { duration: 15 }),
+        committed.value = true;
+        translateX.value = withSpring(0, SPRING_BACK);
+        // Finish the scribble at a constant pen speed from wherever the finger left it.
+        const remaining = 1 - strike.value;
+        strike.value = withTiming(
+          1,
+          { duration: 110 + remaining * 240, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) land();
+          },
         );
-
-        strikeGlow.value = withDelay(130, withSequence(
-          withTiming(1, { duration: 80 }),
-          withTiming(0.3, { duration: 300 }),
-        ));
-
-        // Splats
-        splatOpacity.value = withDelay(160, withSequence(
-          withTiming(0.7, { duration: 50 }),
-          withTiming(0.4, { duration: 400 }),
-        ));
-
-        // Text dims
-        textOpacity.value = withDelay(180, withTiming(0.3, { duration: 200 }));
-
-        // Crumple
-        cardScale.value = withDelay(500, withSequence(
-          withTiming(1.02, { duration: 60 }),
-          withTiming(0.9, { duration: 200, easing: Easing.in(Easing.quad) }),
-        ));
-
-        // Collapse
-        cardHeight.value = withDelay(750, withTiming(0, { duration: 250, easing: Easing.in(Easing.quad) }));
-        cardOpacity.value = withDelay(750, withTiming(0, { duration: 200 }));
-        cardMargin.value = withDelay(750, withTiming(0, { duration: 250 }));
-
-        runOnJS(triggerComplete)();
+      } else if (e.translationX < -DELETE_THRESHOLD) {
+        committed.value = true;
+        flingOutAndDelete();
       } else {
-        translateX.value = withTiming(0, { duration: 200 });
+        translateX.value = withSpring(0, SPRING_BACK);
+        // Not enough — the ink lifts back off the page.
+        strike.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.quad) });
       }
     });
 
-  const containerStyle = useAnimatedStyle(() => ({
-    height: cardHeight.value,
-    marginVertical: cardMargin.value,
-    opacity: cardOpacity.value,
-    overflow: 'hidden' as const,
-  }));
+  const longPress = Gesture.LongPress()
+    .enabled(!editing && Boolean(onEdit))
+    .minDuration(420)
+    .maxDistance(12)
+    .onStart(() => {
+      if (committed.value) return;
+      runOnJS(beginEdit)();
+    });
+
+  const gesture = Gesture.Race(longPress, panGesture);
+
+  const onCardLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      if (!collapsing.value) measuredHeight.value = e.nativeEvent.layout.height;
+    },
+    [collapsing, measuredHeight],
+  );
+
+  const containerStyle = useAnimatedStyle(() => {
+    if (!collapsing.value) {
+      return { opacity: cardOpacity.value, marginVertical: CARD_MARGIN };
+    }
+    const k = 1 - collapse.value;
+    return {
+      opacity: cardOpacity.value,
+      height: Math.max(0, measuredHeight.value * k),
+      marginVertical: CARD_MARGIN * k,
+    };
+  });
 
   const shakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shakeX.value }, { scale: cardScale.value }],
+    transform: [
+      { translateX: shakeX.value },
+      { scale: cardScale.value },
+      { rotate: `${cardRotate.value}deg` },
+    ],
   }));
 
   const cardSlideStyle = useAnimatedStyle(() => ({
@@ -137,127 +333,192 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
     opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
   }));
 
+  const deleteBgStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-24, -DELETE_THRESHOLD * 0.6], [0, 1], Extrapolation.CLAMP),
+  }));
+  const trashStyle = useAnimatedStyle(() => {
+    const armed = translateX.value <= -DELETE_THRESHOLD;
+    return {
+      transform: [{ scale: withSpring(armed ? 1.25 : 1, IOS_SPRING) }],
+    };
+  });
+
   const textAnimStyle = useAnimatedStyle(() => ({ opacity: textOpacity.value }));
-  const swipeProgressStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD * 0.25], [0, 1], Extrapolation.CLAMP),
-  }));
-  const strike1Style = useAnimatedStyle(() => ({
-    width: Math.max(
-      interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH], Extrapolation.CLAMP),
-      strike1Progress.value * SCRIBBLE_WIDTH,
-    ),
-  }));
-  const strike2Style = useAnimatedStyle(() => ({
-    width: Math.max(
-      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.18, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH], Extrapolation.CLAMP),
-      strike2Progress.value * SCRIBBLE_WIDTH,
-    ),
-  }));
-  const strike3Style = useAnimatedStyle(() => ({
-    width: Math.max(
-      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.38, SWIPE_THRESHOLD], [0, SCRIBBLE_WIDTH * 0.9], Extrapolation.CLAMP),
-      strike3Progress.value * SCRIBBLE_WIDTH * 0.9,
-    ),
-  }));
-  const loopStyle = useAnimatedStyle(() => {
-    const progress = Math.max(
-      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.25, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
-      strike2Progress.value,
-    );
-    return {
-      opacity: progress,
-      transform: [{ scaleX: progress }, { rotate: '-7deg' }],
-    };
-  });
-  const pixelXStyle = useAnimatedStyle(() => {
-    const progress = Math.max(
-      interpolate(translateX.value, [SWIPE_THRESHOLD * 0.35, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
-      strike3Progress.value,
-    );
-    return {
-      opacity: progress,
-      transform: [{ scale: progress }],
-    };
-  });
-  const glowStyle = useAnimatedStyle(() => ({ opacity: strikeGlow.value }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: strikeGlow.value * 0.08 }));
   const splatStyle = useAnimatedStyle(() => ({ opacity: splatOpacity.value }));
+
+  const angles = ANGLES[scribbleVariant];
+  const stroke1Style = useStrokeStyle(strike, STROKE_1, angles[0]);
+  const stroke2Style = useStrokeStyle(strike, STROKE_2, angles[1]);
+  const stroke3Style = useStrokeStyle(strike, STROKE_3, angles[2]);
+
+  const loopStyle = useAnimatedStyle(() => {
+    const p = interpolate(strike.value, [0.22, 0.78], [0, 1], Extrapolation.CLAMP);
+    return {
+      opacity: p > 0.002 ? 1 : 0,
+      transform: [{ rotate: '-7deg' }, { scaleX: p }, { scaleY: 0.7 + 0.3 * p }],
+    };
+  });
+
+  const pixelXStyle = useAnimatedStyle(() => {
+    const p = interpolate(strike.value, [0.68, 1], [0, 1], Extrapolation.CLAMP);
+    // Snap in with a little overshoot — pixel-art pop.
+    const scale = p < 0.75 ? (p / 0.75) * 1.18 : 1.18 - ((p - 0.75) / 0.25) * 0.18;
+    return {
+      opacity: p > 0.002 ? 1 : 0,
+      transform: [{ scale }],
+    };
+  });
+
+  const strokeW = { width: SCRIBBLE_WIDTH };
+  const strokeWShort = { width: SCRIBBLE_WIDTH * 0.9 };
+  const strikeColor = { backgroundColor: theme.accent };
 
   const renderScribble = () => {
     if (scribbleVariant === 'zigzag') {
       return (
-        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
-          <Animated.View style={[styles.zig, styles.zig1, strike1Style]} />
-          <Animated.View style={[styles.zig, styles.zig2, strike2Style]} />
-          <Animated.View style={[styles.zig, styles.zig3, strike3Style]} />
-        </Animated.View>
+        <View style={styles.scribbleLayer} pointerEvents="none">
+          <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.zig1, stroke1Style]} />
+          <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.zig2, stroke2Style]} />
+          <Animated.View style={[styles.stroke, strikeColor, strokeWShort, styles.zig3, stroke3Style]} />
+        </View>
       );
     }
 
     if (scribbleVariant === 'markerLoop') {
       return (
-        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
-          <Animated.View style={[styles.loopStroke, loopStyle]} />
-          <Animated.View style={[styles.loopSlash, strike1Style]} />
-          <Animated.View style={[styles.loopSlashTwo, strike2Style]} />
-        </Animated.View>
+        <View style={styles.scribbleLayer} pointerEvents="none">
+          <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.loopSlash, stroke1Style]} />
+          <Animated.View
+            style={[styles.loopStroke, { borderColor: theme.accent, width: SCRIBBLE_WIDTH * 0.74 }, loopStyle]}
+          />
+          <Animated.View style={[styles.stroke, strikeColor, strokeWShort, styles.loopSlashTwo, stroke3Style]} />
+        </View>
       );
     }
 
     if (scribbleVariant === 'pixelX') {
       return (
-        <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
-          <Animated.View style={[styles.pixelSlash, styles.pixelSlashA, strike1Style]} />
-          <Animated.View style={[styles.pixelSlash, styles.pixelSlashB, strike2Style]} />
+        <View style={styles.scribbleLayer} pointerEvents="none">
+          <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.pixelSlash, styles.pixelSlashA, stroke1Style]} />
+          <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.pixelSlash, styles.pixelSlashB, stroke2Style]} />
           <Animated.View style={[styles.pixelX, pixelXStyle]}>
-            <View style={[styles.pixelBlock, styles.pixelBlockA]} />
-            <View style={[styles.pixelBlock, styles.pixelBlockB]} />
-            <View style={[styles.pixelBlock, styles.pixelBlockC]} />
-            <View style={[styles.pixelBlock, styles.pixelBlockD]} />
+            <View style={[styles.pixelBlock, strikeColor, styles.pixelBlockA]} />
+            <View style={[styles.pixelBlock, strikeColor, styles.pixelBlockB]} />
+            <View style={[styles.pixelBlock, strikeColor, styles.pixelBlockC]} />
+            <View style={[styles.pixelBlock, strikeColor, styles.pixelBlockD]} />
           </Animated.View>
-        </Animated.View>
+        </View>
       );
     }
 
     return (
-      <Animated.View style={[styles.scribbleLayer, swipeProgressStyle]}>
-        <Animated.View style={[styles.strike1, strike1Style]} />
-        <Animated.View style={[styles.strike2, strike2Style]} />
-        <Animated.View style={[styles.strike3, strike3Style]} />
-      </Animated.View>
+      <View style={styles.scribbleLayer} pointerEvents="none">
+        <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.strike1, stroke1Style]} />
+        <Animated.View style={[styles.stroke, strikeColor, strokeW, styles.strike2, stroke2Style]} />
+        <Animated.View style={[styles.stroke, strikeColor, strokeWShort, styles.strike3, stroke3Style]} />
+      </View>
     );
   };
 
+  // VoiceOver: the swipe gestures are exposed as custom actions, like Reminders.
+  const onAccessibilityAction = useCallback(
+    (e: AccessibilityActionEvent) => {
+      switch (e.nativeEvent.actionName) {
+        case 'complete':
+          if (committed.value) return;
+          committed.value = true;
+          strike.value = withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) }, (f) => {
+            if (f) land();
+          });
+          break;
+        case 'delete':
+          if (committed.value) return;
+          committed.value = true;
+          flingOutAndDelete();
+          break;
+        case 'edit':
+          beginEdit();
+          break;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [beginEdit],
+  );
+
   return (
-    <Animated.View style={containerStyle}>
-      <Animated.View style={[styles.bgReveal, bgStyle]}>
-        <Text style={styles.completeIcon}>✓</Text>
-        <Text style={styles.completeLabel}>DONE!</Text>
+    <Animated.View style={[styles.container, containerStyle]}>
+      <Animated.View style={[styles.bgReveal, { backgroundColor: theme.green }, bgStyle]}>
+        <Symbol name="checkmark" size={22} color="#fff" weight="heavy" />
+        <Text style={styles.completeLabel} allowFontScaling={false}>
+          DONE!
+        </Text>
+      </Animated.View>
+
+      <Animated.View style={[styles.bgDelete, { backgroundColor: theme.accent }, deleteBgStyle]}>
+        <Animated.View style={trashStyle}>
+          <Symbol name="trash.fill" size={20} color="#fff" weight="semibold" />
+        </Animated.View>
       </Animated.View>
 
       <Animated.View style={shakeStyle}>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View style={[styles.card, cardSlideStyle]}>
-            <Animated.View style={[styles.glowOverlay, glowStyle]} />
+        <GestureDetector gesture={gesture}>
+          <Animated.View
+            onLayout={onCardLayout}
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.surface,
+                borderColor: editing ? theme.accent : theme.borderStrong,
+                shadowColor: theme.shadow,
+              },
+              cardSlideStyle,
+            ]}
+            accessible={!editing}
+            accessibilityRole="button"
+            accessibilityLabel={task.text}
+            accessibilityHint="Swipe right to complete, left to delete, hold to edit"
+            accessibilityActions={[
+              { name: 'complete', label: 'Complete' },
+              { name: 'delete', label: 'Delete' },
+              ...(onEdit ? [{ name: 'edit', label: 'Edit' }] : []),
+            ]}
+            onAccessibilityAction={onAccessibilityAction}
+          >
+            <Animated.View style={[styles.glowOverlay, { backgroundColor: theme.accent }, glowStyle]} />
 
-            <Animated.View style={textAnimStyle}>
-              <Text style={styles.taskText} numberOfLines={2}>
-                {task.text}
-              </Text>
-            </Animated.View>
+            {editing ? (
+              <TextInput
+                ref={inputRef}
+                style={[styles.taskText, styles.taskInput, { color: theme.text }]}
+                value={draft}
+                onChangeText={setDraft}
+                onSubmitEditing={commitEdit}
+                onBlur={commitEdit}
+                returnKeyType="done"
+                multiline={false}
+                selectTextOnFocus
+                keyboardAppearance={theme.isDark ? 'dark' : 'light'}
+                maxFontSizeMultiplier={1.3}
+                accessibilityLabel="Edit task"
+              />
+            ) : (
+              <Animated.View style={textAnimStyle}>
+                <Text
+                  style={[styles.taskText, { color: theme.text }]}
+                  numberOfLines={3}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  {task.text}
+                </Text>
+              </Animated.View>
+            )}
 
             {renderScribble()}
 
-            <Animated.View style={[styles.splat, styles.splat1, splatStyle]} />
-            <Animated.View style={[styles.splat, styles.splat2, splatStyle]} />
-            <Animated.View style={[styles.splat, styles.splat3, splatStyle]} />
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => onDelete(task.id)}
-              hitSlop={8}
-            >
-              <Text style={styles.deleteText}>×</Text>
-            </TouchableOpacity>
+            <Animated.View style={[styles.splat, strikeColor, styles.splat1, splatStyle]} />
+            <Animated.View style={[styles.splat, strikeColor, styles.splat2, splatStyle]} />
+            <Animated.View style={[styles.splat, strikeColor, styles.splat3, splatStyle]} />
           </Animated.View>
         </GestureDetector>
       </Animated.View>
@@ -265,7 +526,7 @@ export function TaskItem({ task, settings, onComplete, onDelete }: TaskItemProps
   );
 }
 
-const STRIKE_RED = '#FF3B30';
+export const TaskItem = memo(TaskItemInner);
 
 function getScribbleVariant(id: string): ScribbleVariant {
   let hash = 0;
@@ -276,151 +537,96 @@ function getScribbleVariant(id: string): ScribbleVariant {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+    marginVertical: CARD_MARGIN,
+  },
   bgReveal: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingLeft: 20,
     borderRadius: 14,
-    backgroundColor: '#178C55',
   },
-  completeIcon: {
-    fontSize: 23,
-    color: COLORS.white,
-    fontWeight: '900',
+  bgDelete: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 22,
+    borderRadius: 14,
   },
   completeLabel: {
     position: 'absolute',
     right: 18,
-    color: COLORS.white,
+    color: '#fff',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.2,
   },
   card: {
-    height: CARD_HEIGHT,
-    backgroundColor: 'rgba(255, 252, 244, 0.9)',
+    minHeight: 58,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(34, 31, 26, 0.12)',
     paddingHorizontal: 18,
+    paddingVertical: 16,
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#564025',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.09,
     shadowRadius: 12,
     elevation: 2,
   },
   taskText: {
-    color: COLORS.text,
     fontSize: 17,
     fontWeight: '700',
-    paddingRight: 32,
+    lineHeight: 22,
+    paddingRight: 8,
+  },
+  taskInput: {
+    paddingVertical: 0,
+    margin: 0,
   },
   glowOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(229, 57, 45, 0.08)',
+    opacity: 0,
     borderRadius: 14,
   },
   scribbleLayer: {
     ...StyleSheet.absoluteFillObject,
-    pointerEvents: 'none',
   },
-  strike1: {
-    position: 'absolute',
-    left: 12,
-    height: 4,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 2,
-    top: '38%',
-    transform: [{ rotate: '5deg' }],
-  },
-  strike2: {
-    position: 'absolute',
-    left: 18,
-    height: 4,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 2,
-    top: '54%',
-    transform: [{ rotate: '-7deg' }],
-  },
-  strike3: {
-    position: 'absolute',
-    left: 26,
-    height: 3,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 2,
-    top: '48%',
-    transform: [{ rotate: '1deg' }],
-  },
-  zig: {
+  // Base pen stroke. Full length is laid out once; drawing is a scaleX from the left
+  // edge so it runs on the UI thread without triggering layout.
+  stroke: {
     position: 'absolute',
     height: 4,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 1,
+    borderRadius: 2,
+    transformOrigin: 'left center',
   },
-  zig1: {
-    left: 12,
-    top: '32%',
-    transform: [{ rotate: '14deg' }],
-  },
-  zig2: {
-    left: 20,
-    top: '52%',
-    transform: [{ rotate: '-15deg' }],
-  },
-  zig3: {
-    left: 28,
-    top: '43%',
-    transform: [{ rotate: '11deg' }],
-  },
+  strike1: { left: 12, top: '38%' },
+  strike2: { left: 18, top: '54%' },
+  strike3: { left: 26, top: '48%', height: 3 },
+  zig1: { left: 12, top: '32%', borderRadius: 1 },
+  zig2: { left: 20, top: '52%', borderRadius: 1 },
+  zig3: { left: 28, top: '43%', borderRadius: 1 },
   loopStroke: {
     position: 'absolute',
     left: 16,
-    top: 9,
-    width: SCRIBBLE_WIDTH * 0.74,
-    height: 40,
+    top: '15%',
+    height: '70%',
     borderWidth: 4,
-    borderColor: STRIKE_RED,
     borderRadius: 24,
+    transformOrigin: 'left center',
   },
-  loopSlash: {
-    position: 'absolute',
-    left: 18,
-    top: '45%',
-    height: 4,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 2,
-    transform: [{ rotate: '-4deg' }],
-  },
-  loopSlashTwo: {
-    position: 'absolute',
-    left: 28,
-    top: '57%',
-    height: 3,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 2,
-    transform: [{ rotate: '5deg' }],
-  },
-  pixelSlash: {
-    position: 'absolute',
-    left: 14,
-    height: 5,
-    backgroundColor: STRIKE_RED,
-    borderRadius: 0,
-  },
-  pixelSlashA: {
-    top: '38%',
-    transform: [{ rotate: '10deg' }],
-  },
-  pixelSlashB: {
-    top: '57%',
-    transform: [{ rotate: '-10deg' }],
-  },
+  loopSlash: { left: 18, top: '45%' },
+  loopSlashTwo: { left: 28, top: '57%', height: 3 },
+  pixelSlash: { left: 14, height: 5, borderRadius: 0 },
+  pixelSlashA: { top: '38%' },
+  pixelSlashB: { top: '57%' },
   pixelX: {
     position: 'absolute',
-    right: 48,
-    top: 15,
+    right: 28,
+    top: '50%',
+    marginTop: -15,
     width: 30,
     height: 30,
   },
@@ -428,7 +634,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 10,
     height: 10,
-    backgroundColor: STRIKE_RED,
   },
   pixelBlockA: { left: 0, top: 0 },
   pixelBlockB: { right: 0, top: 0 },
@@ -436,23 +641,9 @@ const styles = StyleSheet.create({
   pixelBlockD: { right: 0, bottom: 0 },
   splat: {
     position: 'absolute',
-    backgroundColor: STRIKE_RED,
     borderRadius: 10,
   },
   splat1: { width: 6, height: 6, top: '22%', left: '35%' },
   splat2: { width: 4, height: 4, top: '68%', left: '55%' },
   splat3: { width: 7, height: 5, top: '28%', right: '22%', borderRadius: 3 },
-  deleteButton: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  deleteText: {
-    color: COLORS.dimmed,
-    fontSize: 22,
-    fontWeight: '400',
-  },
 });

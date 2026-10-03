@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ToDOMax · Direction 02 — Arcade After Dark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Press+Start+2P&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="guide-base.css" />
+<style>
+  :root {
+    /* ---- Arcade tokens (dark is the default appearance) ---- */
+    --void: #07080F;        /* screen background */
+    --cabinet: #0F1120;     /* surfaces */
+    --cabinet-2: #171A2E;   /* elevated */
+    --bezel: #262A45;       /* borders */
+    --phosphor: #E8F0FF;    /* text */
+    --phosphor-2: #9AA3C7;  /* secondary */
+    --phosphor-3: #5E6688;  /* tertiary */
+    --coin: #FFD23F;        /* primary action — insert coin */
+    --laser: #FF3D7F;       /* strike ink, destructive */
+    --power: #39FF8A;       /* done, earned, 1UP */
+    --plasma: #35D6FF;      /* links, price */
+    --ember: #FF8A3D;       /* Garage */
+    --violet: #B07CFF;      /* Checkout */
+
+    --sg-paper: var(--void);
+    --sg-surface: var(--cabinet);
+    --sg-ink: var(--phosphor);
+    --sg-line: rgba(232, 240, 255, 0.1);
+    --sg-accent: var(--coin);
+    --sg-display: 'Press Start 2P', monospace;
+    --sg-body: 'Space Grotesk', -apple-system, system-ui, sans-serif;
+    --sg-label: 'Press Start 2P', monospace;
+    --sg-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --sg-eyebrow-size: 9px;
+    --sg-eyebrow-tracking: 0.1em;
+    --sg-display-tracking: 0;
+    --sg-radius-card: 14px;
+    --glow-coin: 0 0 24px rgba(255, 210, 63, 0.35);
+    --glow-power: 0 0 20px rgba(57, 255, 138, 0.35);
+    --glow-laser: 0 0 20px rgba(255, 61, 127, 0.4);
+  }
+  body { background: var(--void); }
+  h1 { font-size: clamp(26px, 4.6vw, 54px); line-height: 1.25; text-shadow: 0 0 30px rgba(255,210,63,.25); }
+  h2 { font-size: clamp(16px, 2.3vw, 24px); line-height: 1.5; }
+  h3 { font-family: var(--sg-body); font-weight: 700; }
+  .lede { color: var(--phosphor-2); }
+  .note { color: var(--phosphor-2); }
+
+  /* Scanlines for mock surfaces */
+  .crt { position: relative; }
+  .crt::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px);
+    mix-blend-mode: overlay;
+  }
+
+  .hero {
+    background: radial-gradient(1200px 600px at 20% -10%, rgba(53,214,255,.14), transparent 60%),
+                radial-gradient(900px 500px at 90% 10%, rgba(255,61,127,.14), transparent 60%),
+                var(--void);
+    border-bottom: 1px solid var(--sg-line);
+  }
+  .hero .ticker {
+    margin-top: 40px; display:flex; gap: 28px; flex-wrap: wrap;
+    font-family: var(--sg-label); font-size: 9px; color: var(--phosphor-2); letter-spacing: .08em;
+  }
+  .hero .ticker b { color: var(--coin); }
+  .blink { animation: blink 1.1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .card { border-color: var(--bezel); background: var(--cabinet); }
+  .why .card h3 { font-size: 16px; }
+  .why .card p { font-size: 14px; margin: 0; color: var(--phosphor-2); }
+  .why .card .src { display:block; margin-top: 10px; font-size: 12px; color: var(--phosphor-3); }
+
+  .swatch { border-color: var(--bezel); background: var(--cabinet); }
+  .swatch .meta small { color: var(--phosphor-2); }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--sg-body); font-weight: 700; font-size: 15px;
+    padding: 12px 18px; border-radius: 12px;
+    border: 1px solid var(--bezel); background: var(--cabinet-2); color: var(--phosphor);
+    display:inline-flex; align-items:center; gap: 8px;
+  }
+  .btn.primary { background: var(--coin); color: #1A1400; border-color: transparent; box-shadow: var(--glow-coin); }
+  .btn.price { background: var(--plasma); color: #04202A; border-color: transparent; border-radius: 999px; }
+  .btn.danger { background: var(--laser); color: #fff; border-color: transparent; box-shadow: var(--glow-laser); }
+  .btn.ghost { background: transparent; }
+  .btn.pressed { transform: scale(.96); filter: brightness(.9); }
+  .btn.disabled { background: var(--cabinet); color: var(--phosphor-3); box-shadow: none; }
+
+  .comp { border: 1px solid var(--bezel); border-radius: 16px; padding: 18px; background: var(--cabinet); }
+  .comp h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-family: var(--sg-body); color: var(--phosphor-3); margin-bottom: 14px; font-weight: 700; }
+  .comp .stack { display:grid; gap: 12px; }
+
+  /* Task row */
+  .row {
+    position: relative; border-radius: 14px; padding: 14px 16px 14px 16px;
+    background: linear-gradient(180deg, var(--cabinet-2), var(--cabinet));
+    border: 1px solid var(--bezel);
+    font-family: var(--sg-body); font-weight: 600; font-size: 16px; color: var(--phosphor);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 24px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .row .led { position:absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--plasma); box-shadow: 0 0 10px var(--plasma); }
+  .row.swiping { transform: translateX(44px); }
+  .row-wrap { position: relative; }
+  .row-wrap .under { position:absolute; inset:0; border-radius: 14px; background: var(--power); color: #04200F; display:flex; align-items:center; padding-left: 14px; font-weight: 800; box-shadow: var(--glow-power); }
+  .row.struck .txt { color: var(--phosphor-3); }
+  .row.struck::after { content:''; position:absolute; left: 20px; right: 16px; top: 50%; height: 4px; border-radius: 2px; background: var(--laser); box-shadow: var(--glow-laser); transform: rotate(-2deg); }
+  .row.struck::before { content:''; position:absolute; left: 30px; right: 36px; top: 57%; height: 3px; border-radius: 2px; background: var(--laser); transform: rotate(1.5deg); opacity: .8; }
+
+  .addbar { display:flex; gap: 10px; }
+  .addbar .field { flex: 1; border: 1px solid var(--bezel); border-radius: 14px; padding: 12px 14px; background: var(--cabinet-2); color: var(--phosphor-3); font-weight: 500; display:flex; align-items:center; gap: 8px; }
+  .addbar .field .cursor { width: 8px; height: 16px; background: var(--coin); }
+  .addbar .plus { width: 48px; border-radius: 14px; background: var(--coin); color: #1A1400; display:grid; place-items:center; font-weight: 800; font-size: 22px; box-shadow: var(--glow-coin); }
+
+  .pack { border: 1px solid var(--bezel); border-radius: 16px; background: var(--cabinet); overflow:hidden; }
+  .pack .head { display:flex; align-items:center; gap: 12px; padding: 14px; }
+  .pack .head .cart { width: 44px; height: 44px; border-radius: 10px; display:grid; place-items:center; color: #000; font-weight: 900; font-family: var(--sg-label); font-size: 12px; }
+  .pack .head b { display:block; font-size: 17px; font-weight: 700; }
+  .pack .head small { font-size: 12.5px; color: var(--phosphor-2); }
+  .pack .body { padding: 0 14px 14px; font-size: 13.5px; color: var(--phosphor-2); }
+  .pack .chips { display:flex; flex-wrap:wrap; gap: 6px; margin: 10px 0 14px; }
+  .pack .chip { border: 1px solid var(--bezel); padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--phosphor); background: var(--cabinet-2); }
+  .pack .foot { display:flex; justify-content:space-between; align-items:center; color: var(--phosphor-2); font-size: 12.5px; }
+  .tag { font-family: var(--sg-label); font-size: 7px; padding: 6px 8px; border-radius: 4px; background: var(--coin); color: #1A1400; }
+
+  .tiles { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tile { border: 1px solid var(--bezel); border-radius: 14px; background: var(--cabinet-2); aspect-ratio: 1 / 1.08; display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 6px; text-align:center; padding: 8px; }
+  .tile.earned { border-color: var(--power); box-shadow: var(--glow-power); }
+  .tile .ico { width: 36px; height: 36px; border-radius: 9px; display:grid; place-items:center; font-size: 18px; font-weight: 900; background: var(--cabinet); }
+  .tile b { font-size: 12px; font-weight: 700; line-height: 1.1; }
+  .tile small { font-family: var(--sg-label); font-size: 6px; color: var(--phosphor-3); }
+  .tile.hidden { border-style: dashed; }
+  .tile.locked { opacity: .5; }
+
+  /* Phone */
+  .phone { background: #050609; box-shadow: 0 30px 60px rgba(0,0,0,.6), inset 0 0 0 2px #1f2236; }
+  .phone .screen { background: radial-gradient(500px 300px at 50% 0%, rgba(53,214,255,.12), transparent 70%), var(--void); color: var(--phosphor); }
+  .screen .hdr { padding: 62px 20px 14px; position: relative; }
+  .screen .hdr .ey { font-family: var(--sg-label); font-size: 7px; color: var(--coin); letter-spacing: .1em; }
+  .screen .hdr h4 { font-family: var(--sg-label); font-size: 16px; margin: 12px 0 8px; line-height: 1.3; text-shadow: 0 0 18px rgba(255,210,63,.3); }
+  .screen .hdr .sub { font-size: 12px; color: var(--phosphor-2); }
+  .screen .hdr .hiscore { position:absolute; right: 18px; top: 66px; text-align:right; }
+  .screen .hdr .hiscore small { display:block; font-family: var(--sg-label); font-size: 5px; color: var(--phosphor-3); letter-spacing: .1em; }
+  .screen .hdr .hiscore b { font-family: var(--sg-label); font-size: 14px; color: var(--power); text-shadow: var(--glow-power); display:block; margin-top: 6px; }
+  .screen .list { padding: 6px 16px; display:grid; gap: 10px; }
+  .screen .row { font-size: 14px; padding: 12px 14px 12px 16px; }
+  .screen .bar { position:absolute; left:0; right:0; bottom:0; padding: 12px 16px 30px; background: linear-gradient(180deg, transparent, var(--void) 30%); }
+  .screen .bar .addbar .field { font-size: 13px; padding: 10px 12px; }
+  .screen .bar .addbar .plus { width: 42px; }
+
+  /* Day variant */
+  .phone.day .screen { background: radial-gradient(500px 300px at 50% 0%, rgba(53,214,255,.18), transparent 70%), #EEF1F8; color: #0F1120; }
+  .phone.day .row { background: #fff; border-color: rgba(15,17,32,.1); color: #0F1120; box-shadow: 0 8px 24px rgba(15,17,32,.08); }
+  .phone.day .hdr .sub { color: #5E6688; }
+  .phone.day .hdr .hiscore small { color: #5E6688; }
+  .phone.day .hdr .hiscore b { color: #0FA85A; text-shadow: none; }
+  .phone.day .hdr h4 { text-shadow: none; }
+  .phone.day .bar { background: linear-gradient(180deg, transparent, #EEF1F8 30%); }
+  .phone.day .addbar .field { background: #fff; border-color: rgba(15,17,32,.12); color: #8A90AA; }
+  .phone.day .row.struck .txt { color: #9AA3C7; }
+  .phone.day .row .led { box-shadow: none; }
+
+  /* High score card */
+  .share { width: 340px; background: var(--cabinet); border: 1px solid var(--bezel); border-radius: 18px; padding: 20px; box-shadow: 0 30px 60px rgba(0,0,0,.5); }
+  .share .title { font-family: var(--sg-label); font-size: 10px; color: var(--coin); text-align:center; letter-spacing: .1em; text-shadow: var(--glow-coin); }
+  .share table { width:100%; margin-top: 16px; border-collapse: collapse; font-family: var(--sg-label); font-size: 8px; }
+  .share td { padding: 8px 4px; color: var(--phosphor-2); }
+  .share tr.you td { color: var(--power); text-shadow: var(--glow-power); }
+  .share td:last-child { text-align:right; }
+  .share .foot { margin-top: 14px; display:flex; justify-content:space-between; font-size: 12px; color: var(--phosphor-3); font-family: var(--sg-body); }
+  .share .carts { display:flex; gap: 6px; margin-top: 14px; }
+  .share .carts div { flex:1; height: 26px; border-radius: 5px; border: 1px solid var(--bezel); background: var(--cabinet-2); }
+
+  .toast { display:inline-flex; align-items:center; gap: 10px; background: var(--cabinet-2); border: 1px solid var(--bezel); padding: 10px 14px 10px 10px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .toast .led { width: 26px; height: 26px; border-radius: 50%; background: var(--power); color: #04200F; display:grid; place-items:center; font-weight: 900; box-shadow: var(--glow-power); }
+
+  .motion { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; }
+  .motion .card { font-size: 13.5px; color: var(--phosphor-2); }
+  .motion .card b { display:block; color: var(--phosphor); font-size: 15px; margin-bottom: 4px; }
+  .dodont .card ul { color: var(--phosphor-2); }
+  .topbar { background: rgba(7,8,15,.8); }
+  footer { color: var(--phosphor-2); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumb"><span>ToDOMax style guides /</span> 02 · Arcade After Dark</div>
+  <nav>
+    <a href="index.html">Overview</a>
+    <a href="#why">Why</a>
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#components">Components</a>
+    <a href="#screens">Screens</a>
+    <a href="#viral">Viral artifact</a>
+    <a href="#rules">Rules</a>
+  </nav>
+</div>
+
+<section class="hero crt">
+  <div class="wrap">
+    <p class="eyebrow">Direction 02</p>
+    <h1>ARCADE<br>AFTER DARK</h1>
+    <p class="lede">The app most people will open at 11pm, designed for 11pm. A dark cabinet, phosphor text, one coin‑yellow button and celebrations that look like they belong on the screen — because this time the whole screen is the arcade.</p>
+    <div class="ticker"><span>1UP &nbsp;<b>00027</b></span><span>HI &nbsp;<b>00041</b></span><span>CREDITS &nbsp;<b>19</b></span><span class="blink">INSERT TASK</span></div>
+  </div>
+</section>
+
+<section id="why" class="why">
+  <div class="wrap">
+    <p class="eyebrow">Why this direction</p>
+    <h2>The celebrations are already pixel art. Stop fighting them.</h2>
+    <p class="lede">Today the kit animations (bannerRed, typeGreen, LCD watch) play on top of a cream paper UI — two visual systems sharing a screen. Arcade makes the UI and the celebrations one world, so a completed task feels like clearing a level, not opening a popup.</p>
+    <div class="grid grid-3" style="margin-top:32px">
+      <div class="card">
+        <h3>Balatro: personality beats polish</h3>
+        <p>A poker roguelike with CRT shader and hand‑drawn pixel jokers became 2024–25's word‑of‑mouth hit. Not because it was technically impressive — because it was <b>unmistakable in a 2‑second clip</b>. Arcade gives ToDOMax that: nobody else's to‑do list glows.</p>
+        <small class="src">Balatro visual identity analyses, 2025</small>
+      </div>
+      <div class="card">
+        <h3>Duolingo: a streak you defend</h3>
+        <p>Mobbin's study of 859 streak designs: the sting of losing a streak is about <i>who you are</i>, not the number. Arcade reframes the streak as a <b>HI SCORE</b> you're defending — the oldest loss‑aversion loop in gaming, and one every player already understands.</p>
+        <small class="src">mobbin.com · blog.duolingo.com</small>
+      </div>
+      <div class="card">
+        <h3>Flighty: the control‑room drop</h3>
+        <p>Flighty's page goes from white departure board to a "deep midnight control room with glowing screens". Its dark mode is the <i>premium</i> mode. Arcade is dark‑first for the same reason; the "day" variant is the fallback, not the default.</p>
+        <small class="src">refero.design — Flighty design system</small>
+      </div>
+    </div>
+    <p class="note" style="margin-top:28px">Caution from the research: dark‑first UIs need desaturated accents (fully saturated colors vibrate on dark) and strict contrast checks. Every phosphor color below has been pulled back from pure neon and tested against the cabinet surfaces.</p>
+  </div>
+</section>
+
+<section id="color">
+  <div class="wrap">
+    <p class="eyebrow">Color</p>
+    <h2>Cabinet, phosphor, one coin.</h2>
+    <h3 style="margin-top:36px">Surfaces</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#07080F;color:#9AA3C7">#07080F</div><div class="meta"><b>Void</b><small>Screen. Not pure black — leaves room for glow.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#0F1120;color:#9AA3C7">#0F1120</div><div class="meta"><b>Cabinet</b><small>Cards, sheets.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#171A2E;color:#9AA3C7">#171A2E</div><div class="meta"><b>Cabinet 2</b><small>Elevated: inputs, chips, pressed.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#262A45;color:#E8F0FF">#262A45</div><div class="meta"><b>Bezel</b><small>1px borders. Never thicker.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#E8F0FF">#E8F0FF</div><div class="meta"><b>Phosphor</b><small>Primary text. Slightly blue‑white.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#9AA3C7">#9AA3C7</div><div class="meta"><b>Phosphor 2</b><small>Secondary text.</small></div></div>
+    </div>
+    <h3 style="margin-top:36px">Signals</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FFD23F;color:#1A1400">#FFD23F</div><div class="meta"><b>Coin</b><small>Primary action. The only yellow. Glows 24px @ 35%.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF3D7F;color:#fff">#FF3D7F</div><div class="meta"><b>Laser</b><small>Strike ink, delete. Hot but not neon.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#39FF8A;color:#04200F">#39FF8A</div><div class="meta"><b>Power</b><small>Done, earned, 1UP, hi‑score.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#35D6FF;color:#04202A">#35D6FF</div><div class="meta"><b>Plasma</b><small>Links, price capsules, priority LED.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF8A3D;color:#2A1000">#FF8A3D</div><div class="meta"><b>Ember</b><small>Garage pack.</small></div></div>
+      <div class="swatch"><div class="chip" style="background:#B07CFF;color:#1A0A33">#B07CFF</div><div class="meta"><b>Violet</b><small>Checkout pack.</small></div></div>
+    </div>
+    <table class="tokens" style="margin-top:36px">
+      <tr><th>Context</th><th>Pair</th><th>Contrast</th></tr>
+      <tr><td>Body text</td><td>Phosphor on Void</td><td>17.9 : 1</td></tr>
+      <tr><td>Secondary text</td><td>Phosphor 2 on Cabinet</td><td>7.6 : 1</td></tr>
+      <tr><td>Primary button</td><td>#1A1400 on Coin</td><td>13.2 : 1</td></tr>
+      <tr><td>Price capsule</td><td>#04202A on Plasma</td><td>11.0 : 1</td></tr>
+      <tr><td>Day variant</td><td>#0F1120 on #EEF1F8 · same signal colors, glows off</td><td>16.1 : 1</td></tr>
+    </table>
+    <p class="note">Glow is a border‑radius‑aware shadow in the signal color at 30–40% alpha. It appears only on Coin (always), Power (earned/hi‑score) and Laser (strike). Nothing else glows, or nothing reads as special.</p>
+  </div>
+</section>
+
+<section id="type">
+  <div class="wrap">
+    <p class="eyebrow">Typography</p>
+    <h2>Bitmap for the marquee, grotesk for the game.</h2>
+    <p class="lede">Press Start 2P becomes a real headline face here — the app name, HI SCORE, section marquees — but never body copy. Space Grotesk carries tasks and text: it has just enough geometry to sit next to a bitmap without clashing. JetBrains Mono for numbers that count.</p>
+    <div style="margin-top:28px">
+      <div class="specimen"><div class="spec-meta">Marquee<br>Press Start 2P<br>14–28px · line 1.3</div><div style="font-family:var(--sg-label);font-size:24px;line-height:1.3;color:var(--coin);text-shadow:var(--glow-coin)">LEVEL CLEAR</div></div>
+      <div class="specimen"><div class="spec-meta">Task<br>Space Grotesk 600<br>16px</div><div style="font-weight:600;font-size:18px">Pick up dry cleaning on 7th Ave</div></div>
+      <div class="specimen"><div class="spec-meta">Body<br>Space Grotesk 400/500<br>14–15px</div><div style="font-size:15px;color:var(--phosphor-2)">Every pack adds new ways to cross something off. Tap any celebration to preview it.</div></div>
+      <div class="specimen"><div class="spec-meta">Counter<br>JetBrains Mono 700<br>tabular</div><div style="font-family:var(--sg-mono);font-weight:700;font-size:28px;color:var(--power);text-shadow:var(--glow-power)">00027</div></div>
+      <div class="specimen"><div class="spec-meta">Tag<br>Press Start 2P<br>6–7px</div><div><span class="tag">INSERT TASK</span> &nbsp; <span class="tag" style="background:var(--power);color:#04200F">1UP</span> &nbsp; <span class="tag" style="background:var(--cabinet-2);color:var(--phosphor-2);border:1px solid var(--bezel)">LOCKED</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="wrap">
+    <p class="eyebrow">Components</p>
+    <h2>Glass over a dark cabinet.</h2>
+    <div class="grid grid-2" style="margin-top:32px">
+      <div class="comp">
+        <h3>Task rows — idle / swiping / struck</h3>
+        <div class="stack">
+          <div class="row"><span class="led"></span><span class="txt">Call the dentist about Thursday</span></div>
+          <div class="row-wrap"><div class="under">✓&nbsp; 1UP</div><div class="row swiping"><span class="txt">Book the room for Friday</span></div></div>
+          <div class="row struck"><span class="txt">Water the fig</span></div>
+        </div>
+        <p class="note" style="margin:12px 0 0">A Plasma LED on the left edge marks the top stop. Strike is Laser with glow — the only time pink appears on the home screen.</p>
+      </div>
+      <div class="comp">
+        <h3>Buttons</h3>
+        <div class="stack">
+          <div style="display:flex;gap:12px;flex-wrap:wrap"><span class="btn primary">+ Insert task</span><span class="btn">Preview</span><span class="btn price">$1.99</span><span class="btn danger">Delete</span></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap"><span class="btn primary pressed">+ Insert task</span><span class="btn disabled">+ Insert task</span><span class="btn ghost">Restore</span></div>
+          <div class="toast"><span class="led">✓</span><span style="line-height:1.3">New in your Collection <span style="color:var(--phosphor-2);white-space:nowrap">· Beat the Clock</span></span></div>
+        </div>
+      </div>
+      <div class="comp">
+        <h3>Add bar</h3>
+        <div class="addbar"><div class="field"><span class="cursor blink"></span> Insert task…</div><div class="plus">+</div></div>
+        <p class="note" style="margin:12px 0 0">A blinking block cursor replaces the sparkle pip. It's the most recognisable "type here" in the world.</p>
+      </div>
+      <div class="comp">
+        <h3>Pack card = cartridge</h3>
+        <div class="pack">
+          <div class="head"><div class="cart" style="background:var(--plasma)">GD</div><div><b>Game Day</b><small>Every finished task is a touchdown.</small></div></div>
+          <div class="body">Tecmo‑style touchdowns, spikes, interceptions and the halftime band.
+            <div class="chips"><span class="chip">▶ Touchdown</span><span class="chip">▶ Spike</span><span class="chip">▶ Halftime Band</span><span class="chip">+3</span></div>
+            <div class="foot"><span>6 celebrations</span><span class="btn price" style="padding:8px 16px;font-size:14px">$1.99</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="comp" style="grid-column:1/-1">
+        <h3>Collection tiles — earned / previewed / hidden / locked</h3>
+        <div class="tiles" style="max-width:420px">
+          <div class="tile earned"><div class="ico" style="color:var(--power)">⏱</div><b>Beat the Clock</b><small style="color:var(--power)">×3</small></div>
+          <div class="tile"><div class="ico" style="color:var(--phosphor-2)">◎</div><b>Route Cleared</b><small>PREVIEWED</small></div>
+          <div class="tile hidden"><div class="ico" style="color:var(--phosphor-3)">?</div><b style="color:var(--phosphor-3)">???</b><small>NOT YET</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <p class="eyebrow">Screens</p>
+    <h2>Home — night (default) and day.</h2>
+    <div class="phones" style="margin-top:32px">
+      <div>
+        <div class="phone"><div class="screen crt">
+          <div class="island"></div><div class="status"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey">PLAYER 1 · THU</span><h4>TODOMAX</h4><div class="sub">4 tasks remaining</div>
+            <div class="hiscore"><small>HI SCORE</small><b>00027</b></div></div>
+          <div class="list">
+            <div class="row"><span class="led"></span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="txt">Water the fig</span></div>
+          </div>
+          <div class="bar"><div class="addbar"><div class="field"><span class="cursor blink"></span> Insert task…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Night. No map wallpaper — a faint plasma glow from the top edge, scanlines at 3.5% and cards lit from above. The streak is a HI SCORE in Power green.</div>
+      </div>
+      <div>
+        <div class="phone day"><div class="screen">
+          <div class="island"></div><div class="status"><span>9:41</span><span>●●● ◔</span></div>
+          <div class="hdr"><span class="ey" style="color:#C9A000">PLAYER 1 · THU</span><h4>TODOMAX</h4><div class="sub">4 tasks remaining</div>
+            <div class="hiscore"><small>HI SCORE</small><b>00027</b></div></div>
+          <div class="list">
+            <div class="row"><span class="led"></span><span class="txt">Dry cleaning, 7th Ave</span></div>
+            <div class="row"><span class="txt">Call the dentist</span></div>
+            <div class="row"><span class="txt">Book the Friday room</span></div>
+            <div class="row struck"><span class="txt">Water the fig</span></div>
+          </div>
+          <div class="bar"><div class="addbar"><div class="field"><span class="cursor blink"></span> Insert task…</div><div class="plus">+</div></div></div>
+        </div></div>
+        <div class="phone-caption">Day. A cool off‑white cabinet with the glows switched off; the same signal colors, darkened slightly for contrast (Power → #0FA85A on light).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="viral">
+  <div class="wrap">
+    <p class="eyebrow">Viral artifact</p>
+    <h2>The high score table.</h2>
+    <p class="lede">Every arcade ends on the same screen, and everyone knows how to read it. A weekly table: your streak and tasks cleared against your friends' initials, plus the cartridges you've earned. BeReal proved social stakes with a tiny mechanic; this is ours.</p>
+    <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;margin-top:32px">
+      <div class="share crt">
+        <div class="title">★ HIGH SCORES ★</div>
+        <table>
+          <tr><td>1ST</td><td>MAY</td><td>00041</td></tr>
+          <tr class="you"><td>2ND</td><td>BEN</td><td>00027</td></tr>
+          <tr><td>3RD</td><td>JOS</td><td>00019</td></tr>
+          <tr><td>4TH</td><td>KAT</td><td>00012</td></tr>
+        </table>
+        <div class="carts">
+          <div style="background:var(--laser)"></div><div style="background:var(--power)"></div><div style="background:var(--plasma)"></div><div></div><div></div><div></div>
+        </div>
+        <div class="foot"><span>Week 40 · 23 tasks cleared</span><span>todomax.app</span></div>
+      </div>
+      <div style="max-width:440px">
+        <h3>How it works</h3>
+        <ul style="font-size:14.5px;padding-left:18px;line-height:1.7;color:var(--phosphor-2)">
+          <li><b style="color:var(--phosphor)">Initials, not names.</b> Three letters is the most private leaderboard ever invented — and it's fun to pick them.</li>
+          <li><b style="color:var(--phosphor)">Streak = score.</b> It's defended, not accumulated. Losing your place on the table is the loss‑aversion loop, with the friend layer Duolingo found lifts daily completion 22%.</li>
+          <li><b style="color:var(--phosphor)">Cartridge shelf</b> shows earned celebrations as colored carts — the Collection board, compressed into one line.</li>
+          <li><b style="color:var(--phosphor)">Weekly reset.</b> A new table every Monday keeps newcomers in the game (BeReal's daily window, stretched to a week).</li>
+          <li><b style="color:var(--phosphor)">Solo mode:</b> with no friends added, the table shows your past four weeks instead — you versus you.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Motion &amp; feel</p>
+    <h2>Snappy, lit, a little electric.</h2>
+    <div class="motion" style="margin-top:28px">
+      <div class="card"><b>Press</b>Scale 0.96 + brightness 0.9, spring back. Coin button's glow tightens on press (24px → 12px).</div>
+      <div class="card"><b>Strike</b>Existing scribble, Laser color, with a glow that blooms to 40% on land and settles at 20%.</div>
+      <div class="card"><b>1UP</b>Swipe reveal is Power green with glow; the "DONE!" label becomes "1UP". The land haptic stays Success.</div>
+      <div class="card"><b>Celebrations</b>Unchanged — but the overlay backdrop is Void at 70% so the kit scenes read as "on the cabinet screen". Banner colors already match.</div>
+      <div class="card"><b>Cursor</b>Block cursor blinks at 1.1s (steps 2). Respect Reduce Motion: solid, no blink.</div>
+      <div class="card"><b>Scanlines</b>3.5% overlay on screen backgrounds only. Never on text containers. Off under Reduce Transparency.</div>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <p class="eyebrow">Rules</p>
+    <h2>Do / Don't</h2>
+    <div class="dodont" style="margin-top:28px">
+      <div class="card" style="border-color:var(--power)">
+        <span class="pill" style="background:var(--power);color:#04200F">Do</span>
+        <ul>
+          <li>Glow only Coin, Power and Laser — and only at 20–40% alpha.</li>
+          <li>Keep bezels 1px; depth comes from gradient + glow, not borders.</li>
+          <li>Use Press Start 2P for marquees ≥ 14px or tags ≤ 7px. Nothing in between.</li>
+          <li>Tabular, zero‑padded numbers everywhere a score appears.</li>
+          <li>Ship dark as default; treat day as the accessibility fallback.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:var(--laser)">
+        <span class="pill" style="background:var(--laser);color:#fff">Don't</span>
+        <ul>
+          <li>No pure black (#000) and no pure neon (#0F0, #F0F). Both read cheap.</li>
+          <li>No pixel font in body copy or task text. Ever.</li>
+          <li>No more than one glowing element in a card.</li>
+          <li>Don't add a CRT curvature or chromatic aberration — scanlines are the limit.</li>
+          <li>Don't show friends' real names on the table.</li>
+        </ul>
+      </div>
+    </div>
+    <h3 style="margin-top:40px">Mapping to <code class="tok">lib/theme.ts</code></h3>
+    <table class="tokens">
+      <tr><th>Token</th><th>Night (default)</th><th>Day</th></tr>
+      <tr><td><code>bg</code></td><td>#07080F</td><td>#EEF1F8</td></tr>
+      <tr><td><code>surface</code> / <code>inputBg</code></td><td>#0F1120 / #171A2E</td><td>#FFFFFF / #FFFFFF</td></tr>
+      <tr><td><code>text</code> / <code>textSecondary</code></td><td>#E8F0FF / #9AA3C7</td><td>#0F1120 / #5E6688</td></tr>
+      <tr><td><code>border</code></td><td>#262A45</td><td>rgba(15,17,32,.1)</td></tr>
+      <tr><td><code>accent</code> (strike)</td><td>#FF3D7F</td><td>#E8306E</td></tr>
+      <tr><td><code>gold</code> → <code>coin</code></td><td colspan="2">#FFD23F (button text #1A1400)</td></tr>
+      <tr><td><code>green</code></td><td>#39FF8A</td><td>#0FA85A</td></tr>
+      <tr><td><code>blue</code></td><td>#35D6FF</td><td>#0A9ECF</td></tr>
+      <tr><td>new: <code>glow(color)</code></td><td colspan="2">shadowColor = color, radius 12–24, opacity .3–.4 — iOS only; Android elevation 0.</td></tr>
+      <tr><td>AppBackground</td><td colspan="2">Drop the map JPG; radial plasma gradient + 3.5% scanline tile (tiny PNG, repeat).</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer><div class="wrap">Direction 02 · Arcade After Dark — ToDOMax design exploration. Companion files: <a href="index.html">Overview</a> · <a href="01-signal.html">01 Signal</a> · <a href="03-softplay.html">03 Soft Play</a></div></footer>
+</body>
+</html>

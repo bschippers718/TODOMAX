@@ -1,56 +1,98 @@
 import { useState, useRef } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Text,
-} from 'react-native';
-import { COLORS } from '../lib/types';
+import { View, TextInput, StyleSheet, Platform, PlatformColor } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../lib/theme';
+import { PressableScale } from './ui/PressableScale';
+import { Symbol } from './ui/Symbol';
 
 interface AddTaskInputProps {
   onAdd: (text: string) => void;
+  hapticsEnabled?: boolean;
 }
 
-export function AddTaskInput({ onAdd }: AddTaskInputProps) {
+// Disabled control tint from the system palette so it matches other apps
+// in both appearances; falls back to a static tone off-iOS.
+const DISABLED_FILL =
+  Platform.OS === 'ios' ? PlatformColor('tertiarySystemFill') : 'rgba(120,120,128,0.24)';
+const DISABLED_INK =
+  Platform.OS === 'ios' ? PlatformColor('tertiaryLabel') : 'rgba(60,60,67,0.3)';
+
+export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const hasText = text.trim().length > 0;
 
   const handleSubmit = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    if (hapticsEnabled) Haptics.selectionAsync();
     onAdd(trimmed);
     setText('');
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.inputShell, text.trim() && styles.inputShellActive]}>
-        <Text style={styles.promptPip}>✦</Text>
-        <TextInput
-          ref={inputRef}
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="Add one thing..."
-          placeholderTextColor="#9C9285"
-          returnKeyType="done"
-          onSubmitEditing={handleSubmit}
-          blurOnSubmit={false}
-        />
-      </View>
-      <TouchableOpacity
-        style={[styles.addButton, !text.trim() && styles.addButtonDisabled]}
-        onPress={handleSubmit}
-        disabled={!text.trim()}
-        activeOpacity={0.7}
+    // Bottom padding is the real safe-area inset; the screen's keyboard-controller
+    // KeyboardAvoidingView subtracts it again so the bar lands flush on the keyboard.
+      <View
+        style={[
+          styles.container,
+          {
+            paddingBottom: Math.max(insets.bottom, 12),
+            backgroundColor: theme.composerBg,
+            borderTopColor: theme.separator,
+          },
+        ]}
       >
-        <View style={styles.plusIcon}>
-          <View style={styles.plusH} />
-          <View style={styles.plusV} />
+        <View
+          style={[
+            styles.inputShell,
+            { backgroundColor: theme.inputBg, borderColor: theme.borderStrong, shadowColor: theme.shadow },
+            hasText && { borderColor: theme.accent, shadowColor: theme.accent, shadowOpacity: 0.12 },
+          ]}
+        >
+          <Symbol name="sparkles" size={16} color={theme.gold} style={styles.promptPip} />
+          <TextInput
+            ref={inputRef}
+            style={[styles.input, { color: theme.text }]}
+            value={text}
+            onChangeText={setText}
+            placeholder="Add one thing…"
+            placeholderTextColor={theme.textTertiary}
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+            submitBehavior="submit"
+            enablesReturnKeyAutomatically
+            keyboardAppearance={theme.isDark ? 'dark' : 'light'}
+            autoCorrect
+            autoCapitalize="sentences"
+            maxFontSizeMultiplier={1.3}
+            accessibilityLabel="New task"
+          />
         </View>
-      </TouchableOpacity>
-    </View>
+        <PressableScale
+          style={[
+            styles.addButton,
+            hasText
+              ? { backgroundColor: theme.buttonFill, borderColor: theme.gold, shadowColor: theme.shadow }
+              : { backgroundColor: DISABLED_FILL, borderColor: 'transparent', shadowOpacity: 0 },
+          ]}
+          onPress={handleSubmit}
+          disabled={!hasText}
+          pressedScale={0.92}
+          accessibilityLabel="Add task"
+          accessibilityState={{ disabled: !hasText }}
+        >
+          <Symbol
+            name="plus"
+            size={20}
+            weight="bold"
+            color={hasText ? theme.buttonText : (DISABLED_INK as unknown as string)}
+          />
+        </PressableScale>
+      </View>
   );
 }
 
@@ -60,81 +102,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 34,
-    backgroundColor: 'rgba(247, 241, 228, 0.78)',
-    borderTopColor: 'rgba(34, 31, 26, 0.08)',
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   inputShell: {
     flex: 1,
-    height: 52,
-    backgroundColor: 'rgba(255, 252, 244, 0.86)',
+    minHeight: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(34, 31, 26, 0.12)',
     paddingLeft: 14,
     paddingRight: 8,
     marginRight: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#564025',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
   },
-  inputShellActive: {
-    borderColor: 'rgba(229, 57, 45, 0.42)',
-    shadowColor: '#E5392D',
-    shadowOpacity: 0.12,
-  },
   promptPip: {
-    color: '#D99A21',
-    fontSize: 18,
     marginRight: 8,
   },
   input: {
     flex: 1,
-    color: COLORS.text,
     fontSize: 17,
     fontWeight: '600',
+    paddingVertical: 12,
   },
   addButton: {
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#221F1A',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(217, 154, 33, 0.7)',
-    shadowColor: '#564025',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.14,
     shadowRadius: 10,
-  },
-  addButtonDisabled: {
-    backgroundColor: '#BDB5A9',
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowOpacity: 0,
-  },
-  plusIcon: {
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  plusH: {
-    position: 'absolute',
-    width: 18,
-    height: 2.5,
-    backgroundColor: COLORS.white,
-    borderRadius: 2,
-  },
-  plusV: {
-    position: 'absolute',
-    width: 2.5,
-    height: 18,
-    backgroundColor: COLORS.white,
-    borderRadius: 2,
   },
 });

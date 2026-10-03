@@ -32,6 +32,11 @@ const ANIMATION_SOUNDS: Record<AnimationId, string> = {
   interception: 'whoosh',
   levelClear: 'fanfare',
   pixelPowerUp: 'pop',
+  errandComplete: 'fanfare',
+  routeDrawn: 'whoosh',
+  stopwatchStop: 'pop',
+  carDash: 'whoosh',
+  cashRegister: 'pop',
 };
 
 const VOLUME_MAP: Record<Settings['soundLevel'], number> = {

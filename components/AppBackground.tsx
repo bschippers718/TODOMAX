@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet, View } from 'react-native';
-
-const { width: SW, height: SH } = Dimensions.get('window');
+import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { useTheme } from '../lib/theme';
 
 export function AppBackground({ imageUri }: { imageUri?: string | null }) {
+  const theme = useTheme();
+  const { width: SW, height: SH } = useWindowDimensions();
   const [imageFailed, setImageFailed] = useState(false);
   const showCustomImage = Boolean(imageUri && !imageFailed);
 
@@ -21,17 +23,36 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
             resizeMode="cover"
             onError={() => setImageFailed(true)}
           />
-          <View style={styles.imageScrim} />
+          <View
+            style={[
+              styles.imageScrim,
+              { backgroundColor: theme.isDark ? 'rgba(16, 18, 28, 0.6)' : 'rgba(236, 226, 211, 0.54)' },
+            ]}
+          />
         </>
       ) : null}
-      <View style={[styles.base, showCustomImage && styles.baseOverImage]} />
+      <View
+        style={[
+          styles.base,
+          { backgroundColor: theme.isDark ? '#10121C' : '#E9DDCA' },
+          showCustomImage && styles.baseOverImage,
+        ]}
+      />
       {!showCustomImage && (
         <>
-          <View style={styles.deskMat} />
-          <View style={styles.stationerySheet} />
-          <View style={styles.oliveTab} />
-          <View style={styles.markerGhost} />
-          <View style={styles.shadowPool} />
+          {/* Pixel Manhattan from the Animation Kit: today's route, start to flag. */}
+          <ExpoImage
+            source={theme.mapAsset}
+            style={styles.cityMap}
+            contentFit="cover"
+          />
+          <View style={[styles.cityWash, { backgroundColor: theme.mapWash }]} />
+          <View
+            style={[
+              styles.shadowPool,
+              { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.22)' : 'rgba(58, 43, 30, 0.07)' },
+            ]}
+          />
         </>
       )}
       <View style={[styles.paperGrain, showCustomImage && styles.paperGrainOverImage]}>
@@ -41,6 +62,7 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
             style={[
               styles.fiber,
               {
+                backgroundColor: theme.isDark ? '#FFFFFF' : '#221F1A',
                 left: (index * 47) % SW,
                 top: 38 + ((index * 83) % Math.max(SH - 76, 1)),
                 width: 18 + (index % 5) * 7,
@@ -51,7 +73,14 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
           />
         ))}
       </View>
-      {showCustomImage ? <View style={styles.photoReadabilityWash} /> : null}
+      {showCustomImage ? (
+        <View
+          style={[
+            styles.photoReadabilityWash,
+            { backgroundColor: theme.isDark ? 'rgba(16, 18, 28, 0.2)' : 'rgba(247, 241, 228, 0.18)' },
+          ]}
+        />
+      ) : null}
     </View>
   );
 }
@@ -63,7 +92,6 @@ const styles = StyleSheet.create({
   },
   base: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#E9DDCA',
   },
   baseOverImage: {
     backgroundColor: 'rgba(30, 24, 18, 0.2)',
@@ -73,55 +101,13 @@ const styles = StyleSheet.create({
   },
   imageScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(236, 226, 211, 0.54)',
   },
-  deskMat: {
-    position: 'absolute',
-    top: -SH * 0.1,
-    left: -SW * 0.2,
-    width: SW * 1.3,
-    height: SH * 0.58,
-    borderRadius: 48,
-    backgroundColor: '#CDB99C',
-    opacity: 0.36,
-    transform: [{ rotate: '-9deg' }],
+  cityMap: {
+    ...StyleSheet.absoluteFillObject,
   },
-  stationerySheet: {
-    position: 'absolute',
-    top: SH * 0.14,
-    right: -SW * 0.35,
-    width: SW * 0.9,
-    height: SH * 0.64,
-    borderRadius: 34,
-    backgroundColor: '#F8F1E7',
-    opacity: 0.58,
-    shadowColor: '#5F4933',
-    shadowOffset: { width: -16, height: 18 },
-    shadowOpacity: 0.07,
-    shadowRadius: 26,
-    transform: [{ rotate: '12deg' }],
-  },
-  oliveTab: {
-    position: 'absolute',
-    top: SH * 0.09,
-    left: SW * 0.08,
-    width: SW * 0.36,
-    height: 18,
-    borderRadius: 3,
-    backgroundColor: '#798268',
-    opacity: 0.22,
-    transform: [{ rotate: '-4deg' }],
-  },
-  markerGhost: {
-    position: 'absolute',
-    bottom: SH * 0.23,
-    left: SW * 0.08,
-    width: SW * 0.78,
-    height: 9,
-    borderRadius: 8,
-    backgroundColor: '#B93228',
-    opacity: 0.08,
-    transform: [{ rotate: '-7deg' }],
+  // Wash so header type and cards sit comfortably on the city.
+  cityWash: {
+    ...StyleSheet.absoluteFillObject,
   },
   shadowPool: {
     position: 'absolute',
@@ -130,7 +116,6 @@ const styles = StyleSheet.create({
     right: -20,
     height: 190,
     borderRadius: 110,
-    backgroundColor: 'rgba(58, 43, 30, 0.07)',
   },
   paperGrain: {
     ...StyleSheet.absoluteFillObject,
@@ -141,10 +126,8 @@ const styles = StyleSheet.create({
   fiber: {
     position: 'absolute',
     height: 1,
-    backgroundColor: '#221F1A',
   },
   photoReadabilityWash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(247, 241, 228, 0.18)',
   },
 });

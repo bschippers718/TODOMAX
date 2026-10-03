@@ -35,7 +35,15 @@ export type AnimationId =
   | 'instantReplay'
   | 'interception'
   | 'levelClear'
-  | 'pixelPowerUp';
+  | 'pixelPowerUp'
+  // Errand Run (Animation Kit style)
+  | 'errandComplete'
+  | 'routeDrawn'
+  | 'stopwatchStop'
+  // Garage pack
+  | 'carDash'
+  // Checkout pack
+  | 'cashRegister';
 
 export const ALL_ANIMATION_IDS: AnimationId[] = [
   'touchdown',
@@ -52,6 +60,11 @@ export const ALL_ANIMATION_IDS: AnimationId[] = [
   'interception',
   'levelClear',
   'pixelPowerUp',
+  'errandComplete',
+  'routeDrawn',
+  'stopwatchStop',
+  'carDash',
+  'cashRegister',
 ];
 
 export interface CelebrationAnimationProps {
@@ -88,6 +101,32 @@ export const ANIM_COLORS = {
   white: '#FFFFFF',
   dimmed: '#666666',
   accent: '#FFD700',
+} as const;
+
+// Palette lifted from the Animation Kit (pixel Manhattan, red banners, LCD watch)
+export const KIT_COLORS = {
+  sky: '#3F8FD6',
+  water: '#2F7CC4',
+  bannerRed: '#E3221B',
+  bannerYellow: '#E8D21C',
+  bannerShadow: '#1B1B1B',
+  typeGreen: '#1FD36A',
+  route: '#F6E21A',
+  cream: '#FFF7E0',
+  ink: '#161616',
+  // building shards
+  shardBlue: '#6FA3D1',
+  shardBlueDark: '#3E6E9E',
+  shardGreen: '#4F9A3A',
+  shardGray: '#C9D3DC',
+  // LCD
+  lcd: '#B7C4B0',
+  lcdInk: '#1E2A22',
+  watchBody: '#1A1E2A',
+  watchTrim: '#4A90E2',
+  // road
+  asphalt: '#2E2E33',
+  curb: '#F2E7C9',
 } as const;
 
 export function generateId(): string {
