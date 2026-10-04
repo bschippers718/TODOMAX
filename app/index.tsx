@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, FlatList } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
@@ -21,11 +20,11 @@ import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { useToast } from '../components/ui/Toast';
 import { ANIMATION_DURATIONS } from '../components/animations';
-import { useTheme, IOS_SPRING } from '../lib/theme';
+import { useTheme } from '../lib/theme';
 import { CELEBRATION_COOLDOWN_MS, isQuietHour, Settings, Task } from '../lib/types';
 import { ANIMATION_META, getAnimationName } from '../lib/collection';
 import { getPackForAnimation, packAccent } from '../lib/packs';
-import { KEYS, loadJSON, saveJSON } from '../lib/storage';
+import { animateNextLayout } from '../lib/nativeLayout';
 
 // Matches CelebrationOverlay's cap for the minimal variant.
 const MINIMAL_VISUAL_MS = 1100;
@@ -75,22 +74,6 @@ export default function HomeScreen() {
   const [showCompleted, setShowCompleted] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // First launch: nudge the top row once so the swipe is discoverable.
-  const [hintPending, setHintPending] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    loadJSON<boolean>(KEYS.HINT_SHOWN).then((shown) => {
-      if (!cancelled && !shown) setHintPending(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const markHintShown = useCallback(() => {
-    setHintPending(false);
-    saveJSON(KEYS.HINT_SHOWN, true);
-  }, []);
-
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
@@ -103,6 +86,8 @@ export default function HomeScreen() {
   // The card has collapsed: commit the state change and roll the celebration.
   const handleComplete = useCallback(
     (id: string) => {
+      // The row has already collapsed; this covers the footer/empty-state swap.
+      animateNextLayout(reduceMotion);
       completeTask(id);
 
       const now = Date.now();
@@ -132,15 +117,27 @@ export default function HomeScreen() {
         }, visualMs + 450);
       }
     },
-    [completeTask, triggerCelebration, streak, playCelebration, recordEarned, showToast, theme.isSignal, settings, router],
+    [completeTask, triggerCelebration, streak, playCelebration, recordEarned, showToast, theme.isSignal, settings, router, reduceMotion],
   );
 
   const toggleCompleted = useCallback(() => {
     if (settings.hapticsEnabled) Haptics.selectionAsync();
+    animateNextLayout(reduceMotion);
     setShowCompleted((v) => !v);
-  }, [settings.hapticsEnabled]);
+  }, [settings.hapticsEnabled, reduceMotion]);
 
-  const layout = reduceMotion ? undefined : LinearTransition.springify().damping(IOS_SPRING.damping).stiffness(IOS_SPRING.stiffness);
+  const handleAdd = useCallback(
+    (text: string) => {
+      animateNextLayout(reduceMotion);
+      addTask(text);
+    },
+    [addTask, reduceMotion],
+  );
+
+  const handleClearCompleted = useCallback(() => {
+    animateNextLayout(reduceMotion);
+    clearCompleted();
+  }, [clearCompleted, reduceMotion]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: Task; index: number }) => (
@@ -153,11 +150,9 @@ export default function HomeScreen() {
         onComplete={handleComplete}
         onDelete={deleteTask}
         onEdit={editTask}
-        hint={index === 0 && hintPending}
-        onHintShown={markHintShown}
       />
     ),
-    [settings, reduceMotion, handleStrike, handleComplete, deleteTask, editTask, hintPending, markHintShown],
+    [settings, reduceMotion, handleStrike, handleComplete, deleteTask, editTask],
   );
 
   const route = useMemo(() => buildRoute(tasks), [tasks]);
@@ -253,7 +248,7 @@ export default function HomeScreen() {
         >
           {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : 'End of the line.'}
         </Text>
-        <DailyRoute tasks={tasks} streak={streak} reduceMotion={reduceMotion} variant="inline" />
+        <DailyRoute tasks={tasks} streak={streak} variant="inline" />
       </View>
       <View style={styles.glyphRow}>
         <PressableScale
@@ -282,7 +277,7 @@ export default function HomeScreen() {
   );
 
   const classicEmpty = (
-    <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(260)} style={[styles.emptyContainer, cardChrome]}>
+    <View style={[styles.emptyContainer, cardChrome]}>
       <View
         style={[
           styles.emptyBadge,
@@ -304,23 +299,23 @@ export default function HomeScreen() {
         </Text>
         <Symbol name="chevron.right" size={12} color={theme.blue} weight="bold" />
       </PressableScale>
-    </Animated.View>
+    </View>
   );
 
-  // Board clear → the one place the route gets a card: it's the reward, and
-  // it's shareable. An empty board with nothing done today stays quiet.
+  // Board clear → the one place the route gets a card: it's the day's summary.
+  // An empty board with nothing done today stays quiet.
   const signalEmpty = boardClear ? (
-    <DailyRoute tasks={tasks} streak={streak} reduceMotion={reduceMotion} variant="card" haptics={settings.hapticsEnabled} />
+    <DailyRoute tasks={tasks} streak={streak} variant="card" />
   ) : (
-    <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(260)} style={styles.quietEmpty}>
+    <View style={styles.quietEmpty}>
       <Text style={[styles.quietEmptyText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
         Add one stop to start today's route.
       </Text>
-    </Animated.View>
+    </View>
   );
 
   const classicStruck = (
-    <Animated.View layout={layout} style={[styles.completedSection, cardChrome]}>
+    <View style={[styles.completedSection, cardChrome]}>
       <PressableScale
         style={styles.completedHeader}
         onPress={toggleCompleted}
@@ -335,7 +330,7 @@ export default function HomeScreen() {
         <Symbol name="chevron.right" size={14} color={theme.textTertiary} weight="bold" style={showCompleted ? styles.chevronOpen : undefined} />
       </PressableScale>
       {showCompleted && (
-        <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(180)} exiting={reduceMotion ? undefined : FadeOut.duration(120)}>
+        <View>
           {completedTasks.map((task) => (
             <View
               key={task.id}
@@ -351,19 +346,19 @@ export default function HomeScreen() {
               </Text>
             </View>
           ))}
-          <PressableScale style={styles.clearButton} onPress={clearCompleted} pressStyle="scale">
+          <PressableScale style={styles.clearButton} onPress={handleClearCompleted} pressStyle="scale">
             <Text style={[styles.clearButtonText, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
               Clear completed
             </Text>
           </PressableScale>
-        </Animated.View>
+        </View>
       )}
-    </Animated.View>
+    </View>
   );
 
   // A grey line of text that opens in place. No card, no stamps.
   const signalStruck = (
-    <Animated.View layout={layout} style={styles.struckSection}>
+    <View style={styles.struckSection}>
       <PressableScale
         style={styles.struckLine}
         onPress={toggleCompleted}
@@ -380,7 +375,7 @@ export default function HomeScreen() {
         <Symbol name="chevron.right" size={11} color={theme.textTertiary} weight="bold" style={showCompleted ? styles.chevronOpen : undefined} />
       </PressableScale>
       {showCompleted && (
-        <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(180)} exiting={reduceMotion ? undefined : FadeOut.duration(120)}>
+        <View>
           {completedTasks.map((task) => (
             <View key={task.id} style={[styles.struckItem, { borderTopColor: theme.separator }]}>
               <View style={[styles.struckDot, { backgroundColor: theme.green }]} />
@@ -395,15 +390,15 @@ export default function HomeScreen() {
                 Collection ›
               </Text>
             </PressableScale>
-            <PressableScale style={styles.struckAction} onPress={clearCompleted} pressStyle="scale" hitSlop={8}>
+            <PressableScale style={styles.struckAction} onPress={handleClearCompleted} pressStyle="scale" hitSlop={8}>
               <Text style={[styles.struckActionText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
                 Clear struck
               </Text>
             </PressableScale>
           </View>
-        </Animated.View>
+        </View>
       )}
-    </Animated.View>
+    </View>
   );
 
   return (
@@ -422,11 +417,10 @@ export default function HomeScreen() {
       >
         {signal ? signalHeader : classicHeader}
 
-        <Animated.FlatList
+        <FlatList
           data={activeTasks}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          itemLayoutAnimation={layout}
           contentContainerStyle={styles.list}
           contentInsetAdjustmentBehavior="automatic"
           keyboardDismissMode="interactive"
@@ -437,7 +431,7 @@ export default function HomeScreen() {
           ListFooterComponent={completedTasks.length > 0 ? (signal ? signalStruck : classicStruck) : null}
         />
 
-        <AddTaskInput onAdd={addTask} hapticsEnabled={settings.hapticsEnabled} />
+        <AddTaskInput onAdd={handleAdd} hapticsEnabled={settings.hapticsEnabled} />
       </KeyboardAvoidingView>
 
       {toast}

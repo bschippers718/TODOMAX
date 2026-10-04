@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect, memo } from 'react';
+import { useRef, useCallback, useState, memo } from 'react';
 import {
   Text,
   View,
@@ -63,9 +63,6 @@ interface TaskItemProps {
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, text: string) => void;
-  /** First launch only: nudge the row right once so the swipe is discoverable. */
-  hint?: boolean;
-  onHintShown?: () => void;
 }
 
 /**
@@ -107,8 +104,6 @@ function TaskItemInner({
   onComplete,
   onDelete,
   onEdit,
-  hint = false,
-  onHintShown,
 }: TaskItemProps) {
   const theme = useTheme();
   const { width: SW } = useWindowDimensions();
@@ -119,22 +114,6 @@ function TaskItemInner({
   const [struck, setStruck] = useState(false);
 
   const translateX = useSharedValue(0);
-
-  // A single 12px peek to the right, then back — the row shows what it can do.
-  useEffect(() => {
-    if (!hint) return;
-    const t = setTimeout(() => {
-      if (!reduceMotion) {
-        translateX.value = withSequence(
-          withTiming(14, { duration: 260, easing: Easing.out(Easing.cubic) }),
-          withDelay(140, withSpring(0, SPRING_BACK)),
-        );
-      }
-      onHintShown?.();
-    }, 900);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hint]);
   const strike = useSharedValue(0);
   const committed = useSharedValue(false);
 

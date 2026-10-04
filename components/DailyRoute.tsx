@@ -1,11 +1,7 @@
 import { useMemo } from 'react';
-import { Share, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { StyleSheet, Text, View } from 'react-native';
 import { Task } from '../lib/types';
-import { useTheme, IOS_SPRING } from '../lib/theme';
-import { PressableScale } from './ui/PressableScale';
-import { Symbol } from './ui/Symbol';
+import { useTheme } from '../lib/theme';
 
 type Stop = 'done' | 'carried' | 'open';
 
@@ -53,14 +49,6 @@ export function buildRoute(tasks: Task[], now = Date.now()): { stops: Stop[]; do
   return { stops, done, carried, open };
 }
 
-/** Text form of the route, pasteable anywhere — the Wordle trick. */
-export function routeShareText(stops: Stop[], streak: number, now = new Date()): string {
-  const squares = stops.map((s) => (s === 'done' ? '🟩' : s === 'carried' ? '🟧' : '⬜')).join('');
-  const day = `${DAYS[now.getDay()]} ${MONTHS[now.getMonth()]} ${now.getDate()}`;
-  const streakLine = streak > 0 ? `\n${streak}-day streak` : '';
-  return `ToDOMax · ${day}\n${squares}${streakLine}\ntodomax.app`;
-}
-
 function summaryOf(done: number, carried: number, open: number): string {
   if (done + carried + open === 0) return 'No stops yet';
   return [done && `Done ${done}`, carried && `Carried ${carried}`, open && `Open ${open}`].filter(Boolean).join(' · ');
@@ -69,16 +57,13 @@ function summaryOf(done: number, carried: number, open: number): string {
 interface Props {
   tasks: Task[];
   streak: number;
-  reduceMotion?: boolean;
-  /** `inline`: quiet row of small squares under the headline. `card`: the board-clear artifact. */
+  /** `inline`: quiet row of small squares under the headline. `card`: the board-clear summary. */
   variant?: 'inline' | 'card';
-  haptics?: boolean;
 }
 
-export function DailyRoute({ tasks, streak, reduceMotion = false, variant = 'inline', haptics = true }: Props) {
+export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
   const theme = useTheme();
   const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks]);
-  const layout = reduceMotion ? undefined : LinearTransition.springify().damping(IOS_SPRING.damping).stiffness(IOS_SPRING.stiffness);
   const colorFor = (s: Stop) => (s === 'done' ? theme.green : s === 'carried' ? theme.orange : 'transparent');
   const summary = summaryOf(done, carried, open);
 
@@ -87,11 +72,10 @@ export function DailyRoute({ tasks, streak, reduceMotion = false, variant = 'inl
     const overflow = stops.length - shown.length;
     return (
       <View style={styles.inline} accessible accessibilityLabel={`Daily route, ${summary}${streak > 0 ? `, ${streak} day streak` : ''}`}>
-        <Animated.View style={styles.inlineRow} layout={layout}>
+        <View style={styles.inlineRow}>
           {shown.map((s, i) => (
-            <Animated.View
+            <View
               key={`${s}-${i}`}
-              layout={layout}
               style={[
                 styles.inlineSquare,
                 { backgroundColor: colorFor(s), borderColor: s === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
@@ -103,7 +87,7 @@ export function DailyRoute({ tasks, streak, reduceMotion = false, variant = 'inl
               +{overflow}
             </Text>
           )}
-        </Animated.View>
+        </View>
         {streak > 0 && (
           <Text style={[styles.inlineStreak, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
             {stops.length > 0 ? '·  ' : ''}
@@ -114,19 +98,9 @@ export function DailyRoute({ tasks, streak, reduceMotion = false, variant = 'inl
     );
   }
 
-  // ---- Card: the end of the movie -----------------------------------------
-  const share = async () => {
-    if (haptics) Haptics.selectionAsync();
-    try {
-      await Share.share({ message: routeShareText(stops, streak) });
-    } catch {
-      // user dismissed the sheet
-    }
-  };
-
+  // ---- Card: the board-clear summary ---------------------------------------
   return (
-    <Animated.View
-      entering={reduceMotion ? undefined : FadeIn.duration(320)}
+    <View
       style={[
         styles.card,
         theme.shadowCard,
@@ -171,22 +145,8 @@ export function DailyRoute({ tasks, streak, reduceMotion = false, variant = 'inl
         <Text style={[styles.streak, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
           {streak > 0 ? `${streak}-day streak` : 'First stop of a streak'}
         </Text>
-        <PressableScale
-          style={[
-            styles.shareButton,
-            theme.shadowControl,
-            { backgroundColor: theme.gold, borderColor: theme.cardBorder, borderWidth: 2, borderRadius: theme.radiusControl },
-          ]}
-          onPress={share}
-          accessibilityLabel="Share route"
-        >
-          <Symbol name="square.and.arrow.up" size={14} color={theme.onGold} weight="bold" />
-          <Text style={[styles.shareText, theme.fontTask, { color: theme.onGold }]} maxFontSizeMultiplier={1.2}>
-            Share route
-          </Text>
-        </PressableScale>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -282,9 +242,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardFoot: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -292,17 +249,5 @@ const styles = StyleSheet.create({
   streak: {
     fontSize: 13,
     fontWeight: '700',
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 3,
-    marginBottom: 3,
-  },
-  shareText: {
-    fontSize: 13,
   },
 });
