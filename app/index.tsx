@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Platform, FlatList } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
-import { useCelebration } from '../hooks/useCelebration';
-import { useSound } from '../hooks/useSound';
-import { usePacks } from '../hooks/usePacks';
-import { useReduceMotion } from '../hooks/useReduceMotion';
-import { useCollection } from '../hooks/useCollection';
+import { useStrikeFlow } from '../hooks/useStrikeFlow';
 import { TaskItem } from '../components/TaskItem';
 import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
@@ -18,22 +14,14 @@ import { AppBackground } from '../components/AppBackground';
 import { DailyRoute, buildRoute, todayLabel } from '../components/DailyRoute';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
-import { useToast } from '../components/ui/Toast';
-import { ANIMATION_DURATIONS } from '../components/animations';
-import { useTheme } from '../lib/theme';
-import { CELEBRATION_COOLDOWN_MS, isQuietHour, Settings, Task } from '../lib/types';
-import { ANIMATION_META, getAnimationName } from '../lib/collection';
-import { getPackForAnimation, packAccent } from '../lib/packs';
+import { useTheme, loudType } from '../lib/theme';
+import { Task, openUpstream } from '../lib/types';
 import { animateNextLayout } from '../lib/nativeLayout';
-
-// Matches CelebrationOverlay's cap for the minimal variant.
-const MINIMAL_VISUAL_MS = 1100;
 
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const reduceMotion = useReduceMotion();
   const {
     tasks,
     activeTasks,
@@ -41,83 +29,34 @@ export default function HomeScreen() {
     streak,
     loaded,
     addTask,
-    completeTask,
     deleteTask,
     editTask,
+    setTaskSize,
+    setTaskLine,
     clearCompleted,
   } = useTasks();
-  const { settings: rawSettings } = useSettings();
-  const { unlockedAnimations } = usePacks();
-
-  // Reduce Motion caps celebrations at "minimal" regardless of the user's pick.
-  const settings: Settings = useMemo(
-    () =>
-      reduceMotion && rawSettings.animationMode === 'full'
-        ? { ...rawSettings, animationMode: 'minimal' }
-        : rawSettings,
-    [rawSettings, reduceMotion],
-  );
-
-  // Rapid-fire and late-night protection: the celebration still counts (it's
-  // recorded in the Collection) but plays as a glimpse instead of a movie.
-  const [damped, setDamped] = useState(false);
-  const cooldownUntil = useRef(0);
-  const celebrationSettings: Settings = useMemo(
-    () => (damped && settings.animationMode === 'full' ? { ...settings, animationMode: 'minimal' } : settings),
-    [damped, settings],
-  );
-
-  const { celebration, triggerCelebration, dismissCelebration } = useCelebration(settings, unlockedAnimations);
-  const { playComplete, playCelebration } = useSound(settings);
-  const { recordEarned, hasNew, stats } = useCollection(unlockedAnimations);
-  const { show: showToast, toast } = useToast();
+  const { settings: rawSettings, loaded: settingsLoaded } = useSettings();
+  const {
+    settings,
+    reduceMotion,
+    celebration,
+    celebrationSettings,
+    dismissCelebration,
+    toast,
+    hasNew,
+    stats,
+    onStrike,
+    onComplete,
+  } = useStrikeFlow();
   const [showCompleted, setShowCompleted] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-  }, []);
-
-  // The pen lands: sound now, while the card is still on screen.
-  const handleStrike = useCallback(() => {
-    playComplete();
-  }, [playComplete]);
-
-  // The card has collapsed: commit the state change and roll the celebration.
   const handleComplete = useCallback(
-    (id: string) => {
+    (id: string, size: Parameters<typeof onComplete>[1]) => {
       // The row has already collapsed; this covers the footer/empty-state swap.
       animateNextLayout(reduceMotion);
-      completeTask(id);
-
-      const now = Date.now();
-      const quiet = isQuietHour(settings) || now < cooldownUntil.current;
-      setDamped(quiet);
-
-      const animId = triggerCelebration(streak + 1);
-      if (!animId) return;
-      playCelebration(animId);
-
-      const fullMs = ANIMATION_DURATIONS[animId];
-      const visualMs = quiet || settings.animationMode === 'minimal' ? Math.min(fullMs, MINIMAL_VISUAL_MS) : fullMs;
-      cooldownUntil.current = now + visualMs + CELEBRATION_COOLDOWN_MS;
-
-      // Add it to the board. First time? Say so once the movie has finished.
-      const isFirst = recordEarned(animId);
-      if (isFirst) {
-        if (toastTimer.current) clearTimeout(toastTimer.current);
-        toastTimer.current = setTimeout(() => {
-          showToast({
-            title: 'New in your Collection',
-            subtitle: getAnimationName(animId),
-            icon: ANIMATION_META[animId].symbol,
-            tint: (() => { const p = getPackForAnimation(animId); return p ? packAccent(p, theme.isSignal) : undefined; })(),
-            onPress: () => router.push('/collection'),
-          });
-        }, visualMs + 450);
-      }
+      onComplete(id, size);
     },
-    [completeTask, triggerCelebration, streak, playCelebration, recordEarned, showToast, theme.isSignal, settings, router, reduceMotion],
+    [onComplete, reduceMotion],
   );
 
   const toggleCompleted = useCallback(() => {
@@ -139,6 +78,14 @@ export default function HomeScreen() {
     clearCompleted();
   }, [clearCompleted, reduceMotion]);
 
+  const upstreamFor = useCallback(
+    (t: Task) => {
+      const open = openUpstream(t, tasks);
+      return open.length ? open.map((u) => u.text) : undefined;
+    },
+    [tasks],
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: Task; index: number }) => (
       <TaskItem
@@ -146,18 +93,22 @@ export default function HomeScreen() {
         index={index}
         settings={settings}
         reduceMotion={reduceMotion}
-        onStrike={handleStrike}
+        onStrike={onStrike}
         onComplete={handleComplete}
         onDelete={deleteTask}
         onEdit={editTask}
+        onSize={setTaskSize}
+        onLine={setTaskLine}
+        upstream={upstreamFor(item)}
       />
     ),
-    [settings, reduceMotion, handleStrike, handleComplete, deleteTask, editTask],
+    [settings, reduceMotion, onStrike, handleComplete, deleteTask, editTask, setTaskSize, setTaskLine, upstreamFor],
   );
 
   const route = useMemo(() => buildRoute(tasks), [tasks]);
 
-  if (!loaded) return null;
+  if (!loaded || !settingsLoaded) return null;
+  if (!rawSettings.onboarded) return <Redirect href="/onboarding" />;
 
   const remaining = activeTasks.length;
   const signal = theme.isSignal;
@@ -216,6 +167,9 @@ export default function HomeScreen() {
             {streak}
           </Text>
         </View>
+        <PressableScale style={control} onPress={() => router.push('/map')} pressedScale={0.92} accessibilityLabel="Map view">
+          <Symbol name="map" size={19} color={theme.textSecondary} />
+        </PressableScale>
         <PressableScale
           style={control}
           onPress={() => router.push('/collection')}
@@ -240,7 +194,7 @@ export default function HomeScreen() {
           {todayLabel()}
         </Text>
         <Text
-          style={[styles.headline, theme.fontDisplay, { color: theme.text }]}
+          style={[styles.headline, theme.fontDisplay, { color: theme.text }, boardClear && loudType(theme)]}
           maxFontSizeMultiplier={1.2}
           numberOfLines={1}
           adjustsFontSizeToFit
@@ -251,6 +205,16 @@ export default function HomeScreen() {
         <DailyRoute tasks={tasks} streak={streak} variant="inline" />
       </View>
       <View style={styles.glyphRow}>
+        <PressableScale
+          style={styles.glyph}
+          onPress={() => router.push('/map')}
+          pressStyle="scale"
+          pressedScale={0.88}
+          hitSlop={6}
+          accessibilityLabel="Map view"
+        >
+          <Symbol name="map" size={21} color={theme.textTertiary} weight="medium" />
+        </PressableScale>
         <PressableScale
           style={styles.glyph}
           onPress={() => router.push('/collection')}

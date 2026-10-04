@@ -4,6 +4,7 @@ import {
   View,
   StyleSheet,
   TextInput,
+  Pressable,
   useWindowDimensions,
   LayoutChangeEvent,
   AccessibilityActionEvent,
@@ -24,8 +25,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { Task, Settings } from '../lib/types';
-import { useTheme, IOS_SPRING } from '../lib/theme';
+import { Task, Settings, TaskSize, LineId, TASK_SIZES, TASK_SIZE_LABEL, taskSize } from '../lib/types';
+import { useTheme, IOS_SPRING, Theme } from '../lib/theme';
+import { LINES, lineColor, onLineColor } from '../lib/lines';
 import { Symbol } from './ui/Symbol';
 
 const SCRIBBLE_VARIANTS = ['doubleSlash', 'zigzag', 'markerLoop', 'pixelX'] as const;
@@ -60,9 +62,13 @@ interface TaskItemProps {
   /** Fired the instant the scribble lands (sound/haptics belong here). */
   onStrike?: (id: string) => void;
   /** Fired after the card has fully collapsed and can be removed from the list. */
-  onComplete: (id: string) => void;
+  onComplete: (id: string, size: TaskSize) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, text: string) => void;
+  onSize?: (id: string, size: TaskSize) => void;
+  onLine?: (id: string, line: LineId | undefined) => void;
+  /** Open stops this one comes after (texts), shown as a quiet hint. */
+  upstream?: string[];
 }
 
 /**
@@ -104,6 +110,9 @@ function TaskItemInner({
   onComplete,
   onDelete,
   onEdit,
+  onSize,
+  onLine,
+  upstream,
 }: TaskItemProps) {
   const theme = useTheme();
   const { width: SW } = useWindowDimensions();
@@ -131,12 +140,14 @@ function TaskItemInner({
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.text);
+  const size = taskSize(task);
+  const line = task.line;
   const inputRef = useRef<TextInput>(null);
 
   const scribbleVariant = useRef(getScribbleVariant(task.id)).current;
   const hapticsEnabled = settings.hapticsEnabled;
 
-  const fireComplete = useCallback(() => onComplete(task.id), [task.id, onComplete]);
+  const fireComplete = useCallback(() => onComplete(task.id, size), [task.id, onComplete, size]);
   const fireDelete = useCallback(() => onDelete(task.id), [task.id, onDelete]);
   const fireStrike = useCallback(() => {
     // The "it's done" moment is a success notification, not a thud.
@@ -456,7 +467,16 @@ function TaskItemInner({
   const radius = { borderRadius: theme.radiusCard };
   // Signal: the index bullet is the line marker. Express Blue on the first stop,
   // ink on the rest, Go Green once the pen has landed.
-  const bulletColor = struck ? theme.green : index === 0 ? theme.blue : theme.text;
+  const bulletColor = struck ? theme.green : line ? lineColor(line, theme) : index === 0 ? theme.blue : theme.text;
+  const bulletInk = struck ? '#fff' : line ? onLineColor(line, theme) : theme.isDark && index !== 0 ? theme.bg : '#fff';
+  const textStyle = [
+    styles.taskText,
+    size === 'l' ? (signal ? theme.fontDisplay : styles.taskTextBigClassic) : theme.fontTask,
+    { color: theme.text },
+    signal && styles.taskTextSignal,
+    size === 's' && styles.taskTextSmall,
+    size === 'l' && styles.taskTextBig,
+  ];
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>
@@ -501,41 +521,63 @@ function TaskItemInner({
             onAccessibilityAction={onAccessibilityAction}
           >
            {/* Inner layer clips the scribble; the outer keeps its shadow unclipped. */}
-           <View style={[styles.cardInner, { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }, signal ? styles.cardInnerSignal : styles.cardInnerClassic]}>
+           <View
+             style={[
+               styles.cardInner,
+               { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) },
+               signal ? styles.cardInnerSignal : styles.cardInnerClassic,
+               size === 's' && styles.cardInnerSmall,
+               size === 'l' && styles.cardInnerBig,
+             ]}
+           >
             <Animated.View style={[styles.glowOverlay, { backgroundColor: theme.accent }, glowStyle]} />
 
-            {signal && (
-              <View style={[styles.bullet, { backgroundColor: bulletColor }]}>
-                <Text style={[styles.bulletText, { color: theme.isDark && !struck && index !== 0 ? theme.bg : '#fff' }]} allowFontScaling={false}>
+            {signal ? (
+              <View style={[styles.bullet, size === 'l' && styles.bulletBig, { backgroundColor: bulletColor }]}>
+                <Text style={[styles.bulletText, size === 'l' && styles.bulletTextBig, { color: bulletInk }]} allowFontScaling={false}>
                   {index + 1}
                 </Text>
               </View>
+            ) : (
+              line && <View style={[styles.lineBar, { backgroundColor: lineColor(line, theme) }]} />
             )}
 
             {editing ? (
-              <TextInput
-                ref={inputRef}
-                style={[styles.taskText, theme.fontTask, styles.taskInput, { color: theme.text }, signal && styles.taskTextSignal]}
-                value={draft}
-                onChangeText={setDraft}
-                onSubmitEditing={commitEdit}
-                onBlur={commitEdit}
-                returnKeyType="done"
-                multiline={false}
-                selectTextOnFocus
-                keyboardAppearance={theme.isDark ? 'dark' : 'light'}
-                maxFontSizeMultiplier={1.3}
-                accessibilityLabel="Edit task"
-              />
+              <View>
+                <TextInput
+                  ref={inputRef}
+                  style={[textStyle, styles.taskInput]}
+                  value={draft}
+                  onChangeText={setDraft}
+                  onSubmitEditing={commitEdit}
+                  onBlur={commitEdit}
+                  returnKeyType="done"
+                  multiline={false}
+                  selectTextOnFocus
+                  keyboardAppearance={theme.isDark ? 'dark' : 'light'}
+                  maxFontSizeMultiplier={1.3}
+                  accessibilityLabel="Edit task"
+                />
+                <EditTray
+                  theme={theme}
+                  size={size}
+                  line={line}
+                  onSize={onSize ? (v) => { if (hapticsEnabled) Haptics.selectionAsync(); onSize(task.id, v); } : undefined}
+                  onLine={onLine ? (v) => { if (hapticsEnabled) Haptics.selectionAsync(); onLine(task.id, v); } : undefined}
+                  onDone={commitEdit}
+                />
+              </View>
             ) : (
               <Animated.View style={textAnimStyle}>
-                <Text
-                  style={[styles.taskText, theme.fontTask, { color: theme.text }, signal && styles.taskTextSignal]}
-                  numberOfLines={3}
-                  maxFontSizeMultiplier={1.3}
-                >
+                <Text style={textStyle} numberOfLines={size === 'l' ? 4 : 3} maxFontSizeMultiplier={1.3}>
                   {task.text}
                 </Text>
+                {upstream && upstream.length > 0 && !struck && (
+                  <Text style={[styles.upstream, { color: theme.textTertiary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                    after {upstream[0]}
+                    {upstream.length > 1 ? ` +${upstream.length - 1}` : ''}
+                  </Text>
+                )}
               </Animated.View>
             )}
 
@@ -553,6 +595,102 @@ function TaskItemInner({
 }
 
 export const TaskItem = memo(TaskItemInner);
+
+/**
+ * Size and line live in the edit state, where you're already looking at one
+ * task on purpose. Nothing here is asked at add time.
+ */
+function EditTray({
+  theme,
+  size,
+  line,
+  onSize,
+  onLine,
+  onDone,
+}: {
+  theme: Theme;
+  size: TaskSize;
+  line: LineId | undefined;
+  onSize?: (s: TaskSize) => void;
+  onLine?: (l: LineId | undefined) => void;
+  onDone: () => void;
+}) {
+  const signal = theme.isSignal;
+  return (
+    <View style={[styles.tray, { borderTopColor: theme.separator }]}>
+      {onSize && (
+        <View style={styles.trayGroup} accessibilityRole="radiogroup" accessibilityLabel="Size">
+          {TASK_SIZES.map((s) => {
+            const on = s === size;
+            return (
+              <Pressable
+                key={s}
+                onPress={() => onSize(s)}
+                hitSlop={6}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={TASK_SIZE_LABEL[s]}
+                style={[
+                  styles.sizeChip,
+                  s === 's' && styles.sizeChipS,
+                  s === 'l' && styles.sizeChipL,
+                  {
+                    borderColor: on ? theme.text : theme.textTertiary,
+                    backgroundColor: on ? theme.text : 'transparent',
+                    borderRadius: theme.radiusTag,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.sizeChipText, signal && theme.fontLabel, { color: on ? theme.bg : theme.textSecondary }]}
+                  allowFontScaling={false}
+                >
+                  {s.toUpperCase()}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      {onLine && (
+        <View style={styles.trayGroup} accessibilityRole="radiogroup" accessibilityLabel="Line">
+          <Pressable
+            onPress={() => onLine(undefined)}
+            hitSlop={6}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: !line }}
+            accessibilityLabel="No line"
+            style={[styles.swatch, styles.swatchNone, { borderColor: !line ? theme.text : theme.textTertiary }]}
+          >
+            <View style={[styles.swatchSlash, { backgroundColor: !line ? theme.text : theme.textTertiary }]} />
+          </Pressable>
+          {LINES.map((l) => {
+            const on = l.id === line;
+            return (
+              <Pressable
+                key={l.id}
+                onPress={() => onLine(l.id)}
+                hitSlop={6}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${l.name} line`}
+                style={[
+                  styles.swatch,
+                  { backgroundColor: lineColor(l.id, theme), borderColor: on ? theme.text : 'transparent', borderRadius: signal ? 3 : 10 },
+                ]}
+              />
+            );
+          })}
+        </View>
+      )}
+      <Pressable onPress={onDone} hitSlop={8} style={styles.trayDone} accessibilityRole="button" accessibilityLabel="Done editing">
+        <Text style={[styles.trayDoneText, { color: theme.blue }]} maxFontSizeMultiplier={1.2}>
+          Done
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function getScribbleVariant(id: string): ScribbleVariant {
   let hash = 0;
@@ -649,9 +787,108 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 21,
   },
+  taskTextSmall: {
+    fontSize: 15,
+    lineHeight: 19,
+  },
+  taskTextBig: {
+    fontSize: 22,
+    lineHeight: 26,
+    letterSpacing: -0.6,
+  },
+  taskTextBigClassic: {
+    fontWeight: '800',
+  },
   taskInput: {
     paddingVertical: 0,
     margin: 0,
+  },
+  cardInnerSmall: {
+    minHeight: 42,
+    paddingVertical: 9,
+  },
+  cardInnerBig: {
+    minHeight: 100,
+    paddingVertical: 24,
+  },
+  bulletBig: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginTop: -16,
+    left: 12,
+  },
+  bulletTextBig: {
+    fontSize: 15,
+  },
+  lineBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 5,
+  },
+  upstream: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  tray: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+  },
+  trayGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sizeChip: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  sizeChipS: {
+    width: 22,
+    height: 22,
+  },
+  sizeChipL: {
+    width: 32,
+    height: 32,
+  },
+  sizeChipText: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  swatch: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+  },
+  swatchNone: {
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchSlash: {
+    width: 12,
+    height: 2,
+    transform: [{ rotate: '-45deg' }],
+  },
+  trayDone: {
+    marginLeft: 'auto',
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  trayDoneText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   glowOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -298,3 +298,18 @@ export function useTheme(): Theme {
 /** iOS default spring — what UIKit's interactive animations feel like. */
 export const IOS_SPRING = { damping: 20, stiffness: 220, mass: 0.8 } as const;
 export const IOS_SPRING_SNAPPY = { damping: 18, stiffness: 300, mass: 0.7 } as const;
+
+/**
+ * The loud voice: Route Yellow type with a Stop Red hard shadow, the way a
+ * paperback cover shouts over a skyline. Reserved for moments that have been
+ * earned — the board is clear, or you've just arrived. Never the daily chrome.
+ */
+export function loudType(theme: Theme): TextStyle {
+  if (!theme.isSignal) return {};
+  return {
+    color: theme.gold,
+    textShadowColor: theme.accent,
+    textShadowOffset: { width: 3, height: 3 },
+    textShadowRadius: 0,
+  };
+}

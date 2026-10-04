@@ -3,9 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -20,14 +22,24 @@ import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { HeaderDone } from '../components/ui/HeaderDone';
 import { useToast } from '../components/ui/Toast';
-import { AnimationPack, PACKS, packAccent } from '../lib/packs';
+import { AnimationPack, PACKS, PackId, packAccent } from '../lib/packs';
 import { ALL_ANIMATION_IDS, AnimationId } from '../lib/types';
 import { Theme, useTheme } from '../lib/theme';
 import { CollectionState } from '../lib/collection';
 
 export default function PacksScreen() {
   const theme = useTheme();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
+
+  // Owning and playing are separate. `null` = all owned packs in rotation.
+  const inRotation = (id: PackId) => settings.enabledPacks === null || settings.enabledPacks.includes(id);
+  const setRotation = (id: PackId, on: boolean) => {
+    if (settings.hapticsEnabled) Haptics.selectionAsync();
+    const ownedIds = PACKS.filter((p) => isOwned(p.id)).map((p) => p.id);
+    const current = settings.enabledPacks ?? ownedIds;
+    const next = on ? Array.from(new Set([...current, id])) : current.filter((p) => p !== id);
+    updateSetting('enabledPacks', next.length === ownedIds.length && ownedIds.every((p) => next.includes(p)) ? null : next);
+  };
   const { isOwned, purchasePack, revokePack, pending, unlockedAnimations } = usePacks();
   const { collection, recordPreviewed } = useCollection(unlockedAnimations);
   const { playCelebration } = useSound(settings);
@@ -103,6 +115,8 @@ export default function PacksScreen() {
             onBuy={() => buy(featured)}
             onPreview={startPreview}
             onLongPress={() => {}}
+            inRotation={inRotation(featured.id)}
+            onRotation={(on) => setRotation(featured.id, on)}
             hero
           />
         )}
@@ -119,6 +133,8 @@ export default function PacksScreen() {
             onBuy={() => buy(pack)}
             onPreview={startPreview}
             onLongPress={() => pack.price && isOwned(pack.id) && confirmRevoke(pack)}
+            inRotation={inRotation(pack.id)}
+            onRotation={(on) => setRotation(pack.id, on)}
           />
         ))}
 
@@ -156,6 +172,8 @@ function PackCard({
   onBuy,
   onPreview,
   onLongPress,
+  inRotation,
+  onRotation,
 }: {
   pack: AnimationPack;
   theme: Theme;
@@ -166,6 +184,8 @@ function PackCard({
   onBuy: () => void;
   onPreview: (id: AnimationId) => void;
   onLongPress: () => void;
+  inRotation: boolean;
+  onRotation: (on: boolean) => void;
 }) {
   const isFree = pack.price === null;
   const count = pack.animations.length;
@@ -245,6 +265,25 @@ function PackCard({
         ) : null}
       </View>
 
+      {(isFree || owned) && (
+        <View style={[styles.rotationRow, { borderTopColor: theme.separator }]}>
+          <View style={styles.rotationText}>
+            <Text style={[styles.rotationLabel, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+              In rotation
+            </Text>
+            <Text style={[styles.rotationHint, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
+              {inRotation ? 'Plays when you cross something off.' : 'Kept in your Collection, never played.'}
+            </Text>
+          </View>
+          <Switch
+            value={inRotation}
+            onValueChange={onRotation}
+            accessibilityLabel={`${pack.name} in rotation`}
+            {...(Platform.OS !== 'ios' && { trackColor: { false: theme.separator, true: theme.green } })}
+          />
+        </View>
+      )}
+
       <View style={styles.cardFoot}>
         <Text style={[styles.count, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
           {count} celebration{count === 1 ? '' : 's'}
@@ -295,6 +334,25 @@ function PackCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  rotationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  rotationText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  rotationLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  rotationHint: {
+    fontSize: 12,
+    marginTop: 2,
   },
   content: {
     padding: 20,

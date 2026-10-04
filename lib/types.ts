@@ -1,3 +1,9 @@
+/** How big a job it is. Bigger signs for bigger stops; the strike earns more. */
+export type TaskSize = 's' | 'm' | 'l';
+
+/** Which route line a task sits on — colour as category. */
+export type LineId = 'red' | 'blue' | 'green' | 'orange' | 'purple' | 'yellow' | 'grey';
+
 export interface Task {
   id: string;
   text: string;
@@ -5,6 +11,25 @@ export interface Task {
   createdAt: number;
   completedAt?: number;
   difficulty?: 'normal' | 'hard';
+  size?: TaskSize;
+  line?: LineId;
+  /** Position on the Map canvas, in canvas points. Assigned on first visit. */
+  pos?: { x: number; y: number };
+  /** Upstream stops: this task comes after these. */
+  after?: string[];
+}
+
+export const TASK_SIZES: TaskSize[] = ['s', 'm', 'l'];
+export const TASK_SIZE_LABEL: Record<TaskSize, string> = { s: 'Small', m: 'Medium', l: 'Big' };
+
+export function taskSize(t: Pick<Task, 'size'>): TaskSize {
+  return t.size ?? 'm';
+}
+
+/** Open upstream stops for `t`, i.e. what still has to happen first. */
+export function openUpstream(t: Task, all: Task[]): Task[] {
+  if (!t.after?.length) return [];
+  return t.after.map((id) => all.find((x) => x.id === id)).filter((x): x is Task => Boolean(x) && !x!.completed);
 }
 
 export interface Settings {
@@ -17,6 +42,14 @@ export interface Settings {
   /** After this hour (24h) until 6am, celebrations drop to Minimal. */
   quietHoursEnabled: boolean;
   quietHoursStart: 20 | 21 | 22 | 23;
+  /** First-launch choices made. */
+  onboarded: boolean;
+  /**
+   * Packs whose celebrations are in rotation. `null` means every owned pack.
+   * Owning a pack and playing from it are separate: you can keep Game Day
+   * in your Collection without ever seeing a touchdown.
+   */
+  enabledPacks: string[] | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +60,8 @@ export const DEFAULT_SETTINGS: Settings = {
   style: 'signal',
   quietHoursEnabled: false,
   quietHoursStart: 21,
+  onboarded: false,
+  enabledPacks: null,
 };
 
 /** Quiet hours run from `start` until 6am. */

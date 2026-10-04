@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Task } from '../lib/types';
+import { Task, TaskSize, taskSize } from '../lib/types';
 import { useTheme } from '../lib/theme';
 
-type Stop = 'done' | 'carried' | 'open';
+type StopKind = 'done' | 'carried' | 'open';
+type Stop = { kind: StopKind; size: TaskSize };
 
 const MAX_INLINE = 14;
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -30,23 +31,19 @@ export function todayLabel(now = new Date()): string {
  */
 export function buildRoute(tasks: Task[], now = Date.now()): { stops: Stop[]; done: number; carried: number; open: number } {
   const dayStart = startOfToday();
-  const stops: Stop[] = [];
-  let done = 0;
-  let carried = 0;
-  let open = 0;
+  const groups: Record<StopKind, Stop[]> = { done: [], carried: [], open: [] };
   for (const t of tasks) {
+    const size = taskSize(t);
     if (t.completed) {
-      if ((t.completedAt ?? 0) >= dayStart && (t.completedAt ?? 0) <= now) done++;
+      if ((t.completedAt ?? 0) >= dayStart && (t.completedAt ?? 0) <= now) groups.done.push({ kind: 'done', size });
     } else if (t.createdAt < dayStart) {
-      carried++;
+      groups.carried.push({ kind: 'carried', size });
     } else {
-      open++;
+      groups.open.push({ kind: 'open', size });
     }
   }
-  for (let i = 0; i < done; i++) stops.push('done');
-  for (let i = 0; i < carried; i++) stops.push('carried');
-  for (let i = 0; i < open; i++) stops.push('open');
-  return { stops, done, carried, open };
+  const stops = [...groups.done, ...groups.carried, ...groups.open];
+  return { stops, done: groups.done.length, carried: groups.carried.length, open: groups.open.length };
 }
 
 function summaryOf(done: number, carried: number, open: number): string {
@@ -64,7 +61,9 @@ interface Props {
 export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
   const theme = useTheme();
   const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks]);
-  const colorFor = (s: Stop) => (s === 'done' ? theme.green : s === 'carried' ? theme.orange : 'transparent');
+  const colorFor = (s: Stop) => (s.kind === 'done' ? theme.green : s.kind === 'carried' ? theme.orange : 'transparent');
+  // A big stop is a wider square; a small one is a little narrower.
+  const widthFor = (s: Stop, base: number) => (s.size === 'l' ? Math.round(base * 1.7) : s.size === 's' ? Math.round(base * 0.75) : base);
   const summary = summaryOf(done, carried, open);
 
   if (variant === 'inline') {
@@ -75,10 +74,10 @@ export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
         <View style={styles.inlineRow}>
           {shown.map((s, i) => (
             <View
-              key={`${s}-${i}`}
+              key={`${s.kind}-${i}`}
               style={[
                 styles.inlineSquare,
-                { backgroundColor: colorFor(s), borderColor: s === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
+                { width: widthFor(s, 11), backgroundColor: colorFor(s), borderColor: s.kind === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
               ]}
             />
           ))}
@@ -126,10 +125,10 @@ export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
       <View style={styles.cardSquares}>
         {stops.map((s, i) => (
           <View
-            key={`${s}-${i}`}
+            key={`${s.kind}-${i}`}
             style={[
               styles.cardSquare,
-              { backgroundColor: colorFor(s), borderColor: s === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
+              { width: widthFor(s, 26), backgroundColor: colorFor(s), borderColor: s.kind === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
             ]}
           />
         ))}
