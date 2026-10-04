@@ -109,6 +109,11 @@ export function toggleLink(fromId: string, toId: string) {
   });
 }
 
+/** Replace everything (developer: sample data / reset). Streak is kept. */
+export function replaceTasks(next: Task[]) {
+  setTasks(() => next);
+}
+
 export function clearCompleted() {
   setTasks((prev) => {
     const gone = new Set(prev.filter((t) => t.completed).map((t) => t.id));
@@ -150,6 +155,7 @@ export function useTasks() {
       placeTasks,
       toggleLink,
       clearCompleted,
+      replaceTasks,
     }),
     [],
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +38,30 @@ export default function MapScreen() {
     const placed = autoPlace(activeTasks);
     if (Object.keys(placed).length) placeTasks(placed);
   }, [loaded, activeTasks, placeTasks]);
+
+  // Open fitted to whatever's on the board, once. After that the viewport is yours.
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current || !loaded) return;
+    const placed = activeTasks.filter((t) => t.pos);
+    if (placed.length === 0 || placed.length < activeTasks.length) return;
+    fitted.current = true;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const t of placed) {
+      const w = CARD_WIDTH[t.size ?? 'm'];
+      minX = Math.min(minX, t.pos!.x);
+      minY = Math.min(minY, t.pos!.y);
+      maxX = Math.max(maxX, t.pos!.x + w);
+      maxY = Math.max(maxY, t.pos!.y + 90);
+    }
+    const pad = 20;
+    const availW = W - pad * 2;
+    const availH = H - insets.top - 160 - pad * 2;
+    const s = Math.min(1, Math.max(0.65, Math.min(availW / (maxX - minX), availH / (maxY - minY))));
+    scale.value = s;
+    tx.value = pad - minX * s + Math.max(0, (availW - (maxX - minX) * s) / 2);
+    ty.value = pad - minY * s;
+  }, [loaded, activeTasks, W, H, insets.top, scale, tx, ty]);
 
   // Tap one stop, then another: the second comes after the first.
   const handleSelect = useCallback(

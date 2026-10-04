@@ -5,6 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { useSettings } from '../hooks/useSettings';
 import { usePacks } from '../hooks/usePacks';
 import { useCollection } from '../hooks/useCollection';
+import { useTasks } from '../hooks/useTasks';
+import { buildSampleTasks } from '../lib/sampleData';
 import { PACKS } from '../lib/packs';
 import { useTheme, Theme } from '../lib/theme';
 import { PressableScale } from '../components/ui/PressableScale';
@@ -54,6 +56,27 @@ export default function SettingsScreen() {
   const { settings, updateSetting } = useSettings();
   const { isOwned, unlockedAnimations } = usePacks();
   const { stats } = useCollection(unlockedAnimations);
+  const { tasks, replaceTasks } = useTasks();
+
+  // Developer: a realistic day's worth of stops for look-and-feel.
+  const loadSample = () => {
+    const go = () => {
+      if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      replaceTasks(buildSampleTasks());
+      router.back();
+    };
+    if (tasks.length === 0) return go();
+    Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 12 open and 3 struck.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Replace', style: 'destructive', onPress: go },
+    ]);
+  };
+  const clearAll = () => {
+    Alert.alert('Clear all stops?', 'Open and struck. The streak and Collection stay.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => replaceTasks([]) },
+    ]);
+  };
   const ownedCount = PACKS.filter((p) => isOwned(p.id)).length;
 
   const pickBackground = async () => {
@@ -353,9 +376,36 @@ export default function SettingsScreen() {
 
         <View style={[styles.infoCard, { backgroundColor: signal ? 'transparent' : theme.surfaceSoft, borderRadius: theme.radiusCard }]}>
           <Text style={[styles.infoText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal. Strike several in a row and the follow-ups play as a glimpse, so the movie never gets in your way.
+            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal. Strike several in a row and the follow-ups play short, so the movie never gets in your way.
           </Text>
         </View>
+
+        {__DEV__ && (
+          <View style={styles.section}>
+            <Text style={sectionTitle}>Developer</Text>
+            <View style={card}>
+              <PressableScale style={styles.linkRow} onPress={loadSample} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
+                <View style={styles.linkTextWrap}>
+                  <Text style={[styles.linkTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                    Load sample stops
+                  </Text>
+                  <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                    12 open across every size and line, with links and Map positions, plus 3 struck today.
+                  </Text>
+                </View>
+                <Symbol name="tray.and.arrow.down" size={16} color={theme.textTertiary} weight="semibold" />
+              </PressableScale>
+              <View style={[styles.divider, { backgroundColor: theme.separator }]} />
+              <PressableScale style={styles.linkRow} onPress={clearAll} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
+                <View style={styles.linkTextWrap}>
+                  <Text style={[styles.linkTitle, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
+                    Clear all stops
+                  </Text>
+                </View>
+              </PressableScale>
+            </View>
+          </View>
+        )}
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v1.0</Text>

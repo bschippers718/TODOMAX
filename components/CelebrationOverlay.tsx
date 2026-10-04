@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Pressable, Keyboard, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { StyleSheet, Pressable, Keyboard } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { AnimationId, Settings } from '../lib/types';
 import { useTheme } from '../lib/theme';
 import { animationRegistry, ANIMATION_DURATIONS } from './animations';
@@ -23,7 +23,6 @@ export function CelebrationOverlay({
   onDismiss,
 }: CelebrationOverlayProps) {
   const theme = useTheme();
-  const { width: SW, height: SH } = useWindowDimensions();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -49,56 +48,8 @@ export function CelebrationOverlay({
   const AnimationComponent = animationRegistry[celebration.animationId];
   if (!AnimationComponent) return null;
 
-  const isMinimal = settings.animationMode === 'minimal';
-
-  // Minimal: the same movie through a small window. The animation still lays
-  // out at full screen size and is scaled into a framed card, so nothing in it
-  // needs to know it's being glimpsed.
-  if (isMinimal) {
-    const frameW = Math.round(SW * 0.62);
-    const frameH = Math.round(frameW * 0.78);
-    const scale = frameW / SW;
-    return (
-      <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
-        <Animated.View
-          entering={FadeIn.duration(120)}
-          exiting={FadeOut.duration(150)}
-          style={[styles.animationContainer, styles.minimalHost]}
-          pointerEvents="box-none"
-        >
-          <View
-            style={[
-              styles.frame,
-              theme.shadowCard,
-              {
-                width: frameW,
-                height: frameH,
-                borderRadius: theme.radiusCard,
-                borderColor: theme.cardBorder,
-                borderWidth: theme.borderWidth,
-                backgroundColor: theme.surface,
-              },
-            ]}
-          >
-            <View style={[styles.frameClip, { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }]}>
-              <View
-                style={{
-                  position: 'absolute',
-                  width: SW,
-                  height: SH,
-                  left: (frameW - SW) / 2,
-                  top: (frameH - SH) / 2,
-                  transform: [{ scale }],
-                }}
-              >
-                <AnimationComponent onComplete={onDismiss} streak={celebration.streak} />
-              </View>
-            </View>
-          </View>
-        </Animated.View>
-      </Pressable>
-    );
-  }
+  // Minimal only shortens the moment (see MINIMAL_MS). The movie always owns
+  // the whole screen — a small window never reads as a reward.
 
   return (
     <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
@@ -132,17 +83,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  minimalHost: {
-    // Sit a little above centre so the glimpse reads as "about the list",
-    // not as a modal.
-    paddingBottom: 120,
-  },
-  // Chrome (border + shadow) and clipping live on separate views: iOS drops
-  // a layer's shadow when that same layer clips.
-  frame: {},
-  frameClip: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
   },
 });

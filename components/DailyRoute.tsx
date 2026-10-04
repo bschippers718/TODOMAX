@@ -6,7 +6,7 @@ import { useTheme } from '../lib/theme';
 type StopKind = 'done' | 'carried' | 'open';
 type Stop = { kind: StopKind; size: TaskSize };
 
-const MAX_INLINE = 14;
+const MAX_INLINE = 10;
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const DAYS_LONG = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -164,7 +164,6 @@ const styles = StyleSheet.create({
   inline: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     marginTop: 8,
     minHeight: 12,
   },
@@ -186,6 +185,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginLeft: 4,
+    flexShrink: 0,
   },
 
   card: {
