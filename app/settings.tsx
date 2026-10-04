@@ -66,7 +66,7 @@ export default function SettingsScreen() {
       router.back();
     };
     if (tasks.length === 0) return go();
-    Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 12 open and 3 struck.`, [
+    Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 12 open and 8 struck.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Replace', style: 'destructive', onPress: go },
     ]);

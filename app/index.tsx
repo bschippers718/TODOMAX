@@ -12,6 +12,7 @@ import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
 import { AppBackground } from '../components/AppBackground';
 import { DailyRoute, buildRoute, todayLabel } from '../components/DailyRoute';
+import { StruckList } from '../components/StruckList';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { useTheme, loudType } from '../lib/theme';
@@ -320,49 +321,17 @@ export default function HomeScreen() {
     </View>
   );
 
-  // A grey line of text that opens in place. No card, no stamps.
+  // Struck stops get a sign of their own so they read over a photo too.
   const signalStruck = (
-    <View style={styles.struckSection}>
-      <PressableScale
-        style={styles.struckLine}
-        onPress={toggleCompleted}
-        pressStyle="scale"
-        pressedScale={0.985}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showCompleted }}
-      >
-        <Text style={[styles.struckText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
-          {completedTasks.length} struck
-          {stats.earned > 0 ? `  ·  ${stats.earned} collected` : ''}
-        </Text>
-        <Symbol name="chevron.right" size={11} color={theme.textTertiary} weight="bold" style={showCompleted ? styles.chevronOpen : undefined} />
-      </PressableScale>
-      {showCompleted && (
-        <View>
-          {completedTasks.map((task) => (
-            <View key={task.id} style={[styles.struckItem, { borderTopColor: theme.separator }]}>
-              <View style={[styles.struckDot, { backgroundColor: theme.green }]} />
-              <Text style={[styles.struckItemText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3} numberOfLines={2}>
-                {task.text}
-              </Text>
-            </View>
-          ))}
-          <View style={[styles.struckActions, { borderTopColor: theme.separator }]}>
-            <PressableScale style={styles.struckAction} onPress={() => router.push('/collection')} pressStyle="scale" hitSlop={8}>
-              <Text style={[styles.struckActionText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                Collection ›
-              </Text>
-            </PressableScale>
-            <PressableScale style={styles.struckAction} onPress={handleClearCompleted} pressStyle="scale" hitSlop={8}>
-              <Text style={[styles.struckActionText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                Clear struck
-              </Text>
-            </PressableScale>
-          </View>
-        </View>
-      )}
-    </View>
+    <StruckList
+      tasks={completedTasks}
+      collected={stats.earned}
+      expanded={showCompleted}
+      reduceMotion={reduceMotion}
+      onToggle={toggleCompleted}
+      onCollection={() => router.push('/collection')}
+      onClear={handleClearCompleted}
+    />
   );
 
   return (
@@ -609,53 +578,5 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-
-  // Signal struck line
-  struckSection: {
-    marginTop: 22,
-    paddingHorizontal: 4,
-  },
-  struckLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingVertical: 8,
-  },
-  struckText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  struckItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 11,
-    borderTopWidth: 1,
-  },
-  struckDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 1.5,
-  },
-  struckItemText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    textDecorationLine: 'line-through',
-  },
-  struckActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    paddingTop: 4,
-  },
-  struckAction: {
-    paddingVertical: 10,
-  },
-  struckActionText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
 });
