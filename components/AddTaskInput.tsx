@@ -3,6 +3,7 @@ import { View, TextInput, StyleSheet, Platform, PlatformColor } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../lib/theme';
+import { useSettings } from '../hooks/useSettings';
 import { PressableScale } from './ui/PressableScale';
 import { Symbol } from './ui/Symbol';
 
@@ -35,6 +36,21 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
 
   const signal = theme.isSignal;
   const radius = { borderRadius: theme.radiusControl };
+  const { settings } = useSettings();
+  const hasPhoto = Boolean(settings.customBackgroundUri);
+
+  // Signal: the bar is plain paper, so over a photo it can vanish. A soft lift
+  // (not a hard sign shadow) keeps "where you add a stop" findable without
+  // making the composer compete with the todos.
+  const lift = signal
+    ? {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: theme.isDark ? (hasPhoto ? 0.6 : 0.4) : hasPhoto ? 0.3 : 0.1,
+        shadowRadius: 16,
+        elevation: 6,
+      }
+    : null;
 
   return (
     // Bottom padding is the real safe-area inset; the screen's keyboard-controller
@@ -44,10 +60,12 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
           styles.container,
           {
             paddingBottom: Math.max(insets.bottom, 12),
-            backgroundColor: signal ? theme.bg : theme.composerBg,
-            borderTopColor: theme.separator,
+            // Over a photo the bar becomes enamel, not more paper.
+            backgroundColor: signal ? (hasPhoto ? theme.surface : theme.bg) : theme.composerBg,
+            borderTopColor: signal && hasPhoto ? theme.borderStrong : theme.separator,
             borderTopWidth: StyleSheet.hairlineWidth,
           },
+          lift,
         ]}
       >
         <View
