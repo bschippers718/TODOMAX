@@ -22,6 +22,15 @@ export function todayLabel(now = new Date()): string {
   return `${DAYS_LONG[now.getDay()]} · ${MONTHS[now.getMonth()]} ${now.getDate()}`;
 }
 
+/** "TODAY", "YESTERDAY", then "SAT · OCT 3" — how the struck list names a day. */
+export function dayLabel(ts: number, now = Date.now()): string {
+  const d = new Date(ts);
+  const dayStart = startOfToday();
+  if (ts >= dayStart && ts <= now) return 'TODAY';
+  if (ts >= dayStart - 86_400_000 && ts < dayStart) return 'YESTERDAY';
+  return `${DAYS[d.getDay()]} · ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
 /**
  * Today's route as a strip of squares — the Wordle-grid idea from the Signal
  * style guide. No task text, so it's safe to share; the colours tell the story.

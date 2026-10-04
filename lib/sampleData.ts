@@ -2,8 +2,9 @@ import { Task, LineId, TaskSize } from './types';
 
 /**
  * A realistic day, for look-and-feel: twelve open stops across every size and
- * line, a few links, hand-laid Map positions, and three already struck today
- * so the Daily Route has colour. Loaded from Settings → Developer.
+ * line, a few links, hand-laid Map positions, three already struck today so
+ * the Daily Route has colour, and a few struck on earlier days so the struck
+ * list has day groups. Loaded from Settings → Developer.
  */
 type Seed = {
   text: string;
@@ -15,6 +16,8 @@ type Seed = {
   ageH?: number;
   /** Struck this many minutes ago (today). */
   doneMinAgo?: number;
+  /** Struck this many days ago, mid-afternoon — fills the struck list's day groups. */
+  doneDaysAgo?: number;
 };
 
 const SEEDS: Seed[] = [
@@ -34,13 +37,31 @@ const SEEDS: Seed[] = [
   { text: 'Buy coffee filters', size: 's', line: 'green', pos: { x: 0, y: 0 }, doneMinAgo: 190 },
   { text: 'Reply to the landlord', line: 'grey', pos: { x: 0, y: 0 }, doneMinAgo: 120 },
   { text: 'Submit expense report', size: 'l', line: 'blue', pos: { x: 0, y: 0 }, doneMinAgo: 35 },
+  // Struck on earlier days
+  { text: 'Mail the signed lease', line: 'grey', pos: { x: 0, y: 0 }, doneDaysAgo: 1 },
+  { text: 'Pick up the prescription', size: 's', line: 'red', pos: { x: 0, y: 0 }, doneDaysAgo: 1 },
+  { text: 'Book train tickets to Boston', line: 'blue', pos: { x: 0, y: 0 }, doneDaysAgo: 1 },
+  { text: 'Clean out the fridge', size: 'l', line: 'green', pos: { x: 0, y: 0 }, doneDaysAgo: 3 },
+  { text: 'Cancel the old gym membership', size: 's', pos: { x: 0, y: 0 }, doneDaysAgo: 3 },
 ];
+
+function struckAtFor(s: Seed, now: number): number | undefined {
+  if (s.doneMinAgo !== undefined) return now - s.doneMinAgo * 60_000;
+  if (s.doneDaysAgo !== undefined) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - s.doneDaysAgo);
+    d.setHours(15, 20, 0, 0);
+    return d.getTime();
+  }
+  return undefined;
+}
 
 export function buildSampleTasks(now = Date.now()): Task[] {
   const ids = SEEDS.map((_, i) => `sample-${i + 1}`);
   return SEEDS.map((s, i) => {
-    const done = s.doneMinAgo !== undefined;
-    const createdAt = done ? now - s.doneMinAgo! * 60_000 - 3 * 3_600_000 : now - (s.ageH ?? i * 0.4) * 3_600_000;
+    const struckAt = struckAtFor(s, now);
+    const done = struckAt !== undefined;
+    const createdAt = done ? struckAt - 3 * 3_600_000 : now - (s.ageH ?? i * 0.4) * 3_600_000;
     const t: Task = {
       id: ids[i],
       text: s.text,
@@ -51,7 +72,7 @@ export function buildSampleTasks(now = Date.now()): Task[] {
       pos: done ? undefined : s.pos,
       after: s.after?.map((n) => ids[n]),
     };
-    if (done) t.completedAt = now - s.doneMinAgo! * 60_000;
+    if (struckAt !== undefined) t.completedAt = struckAt;
     return t;
   });
 }
