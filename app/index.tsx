@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useStrikeFlow } from '../hooks/useStrikeFlow';
+import { buildSampleTasks } from '../lib/sampleData';
 import { TaskItem } from '../components/TaskItem';
 import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
@@ -34,6 +35,7 @@ export default function HomeScreen() {
     setTaskSize,
     setTaskLine,
     clearCompleted,
+    replaceTasks,
   } = useTasks();
   const { settings: rawSettings, loaded: settingsLoaded } = useSettings();
   const {
@@ -240,6 +242,19 @@ export default function HomeScreen() {
     </View>
   );
 
+  // A truly empty board offers a filled-in day, so the app can be judged on a real one.
+  const loadSample = () => {
+    animateNextLayout(reduceMotion);
+    replaceTasks(buildSampleTasks());
+  };
+  const sampleLink = (
+    <PressableScale style={styles.sampleLink} onPress={loadSample} pressStyle="scale" accessibilityRole="button">
+      <Text style={[styles.sampleLinkText, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
+        Try it with 20 sample stops
+      </Text>
+    </PressableScale>
+  );
+
   const classicEmpty = (
     <View style={[styles.emptyContainer, cardChrome]}>
       <View
@@ -263,6 +278,7 @@ export default function HomeScreen() {
         </Text>
         <Symbol name="chevron.right" size={12} color={theme.blue} weight="bold" />
       </PressableScale>
+      {tasks.length === 0 && sampleLink}
     </View>
   );
 
@@ -275,6 +291,7 @@ export default function HomeScreen() {
       <Text style={[styles.quietEmptyText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
         Add one stop to start today's route.
       </Text>
+      {tasks.length === 0 && sampleLink}
     </View>
   );
 
@@ -549,6 +566,15 @@ const styles = StyleSheet.create({
   packsLinkText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  sampleLink: {
+    marginTop: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  sampleLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   quietEmpty: {
     paddingTop: 36,
