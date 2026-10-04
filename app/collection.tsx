@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { usePacks } from '../hooks/usePacks';
 import { useSettings } from '../hooks/useSettings';
+import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useSound } from '../hooks/useSound';
 import { useCollection } from '../hooks/useCollection';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
@@ -32,6 +33,7 @@ export default function CollectionScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { settings } = useSettings();
+  const reduceMotion = useReduceMotion();
   const { unlockedAnimations } = usePacks();
   const { collection, stats, recordPreviewed, markViewed } = useCollection(unlockedAnimations);
   const { playCelebration } = useSound(settings);
@@ -93,14 +95,14 @@ export default function CollectionScreen() {
         ))}
 
         <Text style={[styles.fineprint, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
-          Finish a task to earn the celebration that plays. Tap any tile to preview it — previews reveal the name but don’t count as earned.
+          Cross something off to earn the celebration that plays. Tap any tile to preview it — previews reveal the name but don’t count as earned.
         </Text>
       </ScrollView>
 
       <Modal visible={preview !== null} transparent animationType="none" statusBarTranslucent>
         <CelebrationOverlay
           celebration={{ active: preview !== null, animationId: preview, streak: 7 }}
-          settings={{ ...settings, animationMode: 'full' }}
+          settings={{ ...settings, animationMode: reduceMotion ? 'minimal' : 'full' }}
           onDismiss={() => setPreview(null)}
         />
       </Modal>
@@ -235,6 +237,7 @@ function SectionHeader({ theme, section, onUnlock }: { theme: Theme; section: Bo
           onPress={onUnlock}
           pressedScale={0.94}
           accessibilityLabel={`Unlock ${pack.name}`}
+          accessibilityHint="Opens Celebration Packs"
         >
           <Text style={styles.unlockLinkText} allowFontScaling={false}>
             Unlock

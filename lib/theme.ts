@@ -142,7 +142,8 @@ export const LIGHT: Theme = {
   inputBg: 'rgba(255, 252, 244, 0.9)',
   text: '#221F1A',
   textSecondary: '#68707A',
-  textTertiary: '#9C9285',
+  // Hint copy is set in this; it has to clear AA on cream.
+  textTertiary: '#7A7267',
   border: 'rgba(34, 31, 26, 0.1)',
   borderStrong: 'rgba(34, 31, 26, 0.16)',
   separator: 'rgba(34, 31, 26, 0.08)',
@@ -233,7 +234,8 @@ export const SIGNAL_LIGHT: Theme = {
   inputBg: SIGNAL_LINES.enamel,
   text: SIGNAL_LINES.ink,
   textSecondary: '#4A4A4D',
-  textTertiary: SIGNAL_LINES.shuttleGrey,
+  // Shuttle grey reads fine as a swatch but not as 12pt copy on paper.
+  textTertiary: '#5F6063',
   border: 'rgba(11, 11, 12, 0.14)',
   borderStrong: SIGNAL_LINES.ink,
   separator: 'rgba(11, 11, 12, 0.12)',

@@ -15,6 +15,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { usePacks } from '../hooks/usePacks';
 import { useSettings } from '../hooks/useSettings';
+import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useSound } from '../hooks/useSound';
 import { useCollection } from '../hooks/useCollection';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
@@ -30,14 +31,21 @@ import { CollectionState } from '../lib/collection';
 export default function PacksScreen() {
   const theme = useTheme();
   const { settings, updateSetting } = useSettings();
+  const reduceMotion = useReduceMotion();
 
   // Owning and playing are separate. `null` = all owned packs in rotation.
   const inRotation = (id: PackId) => settings.enabledPacks === null || settings.enabledPacks.includes(id);
   const setRotation = (id: PackId, on: boolean) => {
-    if (settings.hapticsEnabled) Haptics.selectionAsync();
     const ownedIds = PACKS.filter((p) => isOwned(p.id)).map((p) => p.id);
     const current = settings.enabledPacks ?? ownedIds;
     const next = on ? Array.from(new Set([...current, id])) : current.filter((p) => p !== id);
+    // Something has to play. Turning celebrations off lives in Settings.
+    if (next.length === 0) {
+      if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showToast({ title: 'Keep one pack playing', subtitle: 'To turn celebrations off, use Settings.', icon: 'sparkles', tint: theme.blue });
+      return;
+    }
+    if (settings.hapticsEnabled) Haptics.selectionAsync();
     updateSetting('enabledPacks', next.length === ownedIds.length && ownedIds.every((p) => next.includes(p)) ? null : next);
   };
   const { isOwned, purchasePack, revokePack, pending, unlockedAnimations } = usePacks();
@@ -67,6 +75,12 @@ export default function PacksScreen() {
   const buy = async (pack: AnimationPack) => {
     const result = await purchasePack(pack.id);
     if (result === 'purchased') {
+      // A pack you just paid for should play. If rotation is an explicit list, add it.
+      if (settings.enabledPacks !== null && !settings.enabledPacks.includes(pack.id)) {
+        const next = [...settings.enabledPacks, pack.id];
+        const ownedIds = PACKS.filter((p) => isOwned(p.id) || p.id === pack.id).map((p) => p.id);
+        updateSetting('enabledPacks', ownedIds.every((p) => next.includes(p)) ? null : next);
+      }
       if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast({
         title: `${pack.name} unlocked`,
@@ -154,7 +168,7 @@ export default function PacksScreen() {
       <Modal visible={preview !== null} transparent animationType="none" statusBarTranslucent>
         <CelebrationOverlay
           celebration={{ active: preview !== null, animationId: preview, streak: 7 }}
-          settings={{ ...settings, animationMode: 'full' }}
+          settings={{ ...settings, animationMode: reduceMotion ? 'minimal' : 'full' }}
           onDismiss={() => setPreview(null)}
         />
       </Modal>
@@ -197,6 +211,7 @@ function PackCard({
     <Pressable
       onLongPress={onLongPress}
       delayLongPress={600}
+      accessible={false}
       style={[
         styles.card,
         signal ? theme.shadowCard : null,

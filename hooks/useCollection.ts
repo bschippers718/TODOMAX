@@ -17,7 +17,8 @@ function notify() {
 function commit(next: CollectionState) {
   state = next;
   notify();
-  saveJSON(KEYS.COLLECTION, state);
+  if (loaded) saveJSON(KEYS.COLLECTION, state);
+  else loadOnce().then(() => saveJSON(KEYS.COLLECTION, state));
 }
 
 function loadOnce() {

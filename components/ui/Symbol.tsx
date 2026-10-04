@@ -18,7 +18,14 @@ export type SymbolName =
   | 'sparkles'
   | 'arrow.clockwise'
   | 'photo.on.rectangle'
-  | 'map.fill';
+  | 'map.fill'
+  | 'map'
+  | 'film'
+  | 'film.fill'
+  | 'gearshape'
+  | 'tray.and.arrow.down'
+  | 'arrow.down.left.and.arrow.up.right'
+  | 'arrow.uturn.backward';
 
 const FALLBACK: Record<SymbolName, string> = {
   'gearshape.fill': '⚙',
@@ -37,6 +44,13 @@ const FALLBACK: Record<SymbolName, string> = {
   'arrow.clockwise': '↻',
   'photo.on.rectangle': '🖼',
   'map.fill': '🗺',
+  map: '🗺',
+  film: '🎞',
+  'film.fill': '🎞',
+  gearshape: '⚙',
+  'tray.and.arrow.down': '⤓',
+  'arrow.down.left.and.arrow.up.right': '⤢',
+  'arrow.uturn.backward': '↶',
 };
 
 interface Props {

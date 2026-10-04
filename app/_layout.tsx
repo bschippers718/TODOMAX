@@ -8,25 +8,34 @@ import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-star
 import { Archivo_700Bold, Archivo_900Black } from '@expo-google-fonts/archivo';
 import * as SplashScreen from 'expo-splash-screen';
 import { useTheme } from '../lib/theme';
+import { useSettings } from '../hooks/useSettings';
+import { useTasks } from '../hooks/useTasks';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const theme = useTheme();
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontsError] = useFonts({
     PressStart2P: PressStart2P_400Regular,
     // Signal's display face — Helvetica's loud cousin, without the licence.
     Archivo_700Bold,
     Archivo_900Black,
   });
 
+  // Hold the splash until the theme and the list are known, so the first
+  // frame is the user's own, not a default-theme flash. A font failure
+  // falls back to system faces rather than hanging on the splash.
+  const { loaded: settingsLoaded } = useSettings();
+  const { loaded: tasksLoaded } = useTasks();
+  const ready = (fontsLoaded || Boolean(fontsError)) && settingsLoaded && tasksLoaded;
+
   useEffect(() => {
-    if (fontsLoaded) {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [ready]);
 
-  if (!fontsLoaded) return null;
+  if (!ready) return null;
 
   // Secondary screens open as sheets with a transparent header; iOS supplies
   // the material / scroll-edge blur itself, the way Settings / Store surfaces

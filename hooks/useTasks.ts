@@ -7,10 +7,16 @@ import { loadJSON, saveJSON, KEYS } from '../lib/storage';
  * of the same stops, so the state lives at module level (like useSettings)
  * and every subscriber sees the same array.
  */
-type State = { tasks: Task[]; streak: number; loaded: boolean };
+/**
+ * A streak is days, not strikes: consecutive calendar days with at least one
+ * stop struck. `lastDay` is the local YYYY-MM-DD of the most recent strike.
+ */
+type Streak = { count: number; lastDay: string | null };
+type State = { tasks: Task[]; streak: Streak; loaded: boolean };
 type Listener = (s: State) => void;
 
-let state: State = { tasks: [], streak: 0, loaded: false };
+const NO_STREAK: Streak = { count: 0, lastDay: null };
+let state: State = { tasks: [], streak: NO_STREAK, loaded: false };
 const listeners = new Set<Listener>();
 let loadPromise: Promise<void> | null = null;
 
@@ -24,7 +30,27 @@ function setTasks(update: (prev: Task[]) => Task[]) {
   if (state.loaded) saveJSON(KEYS.TASKS, state.tasks);
 }
 
-function setStreak(update: (prev: number) => number) {
+function dayKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The streak as it stands right now: alive if the last strike was today or yesterday. */
+export function currentStreak(streak: Streak, now = Date.now()): number {
+  if (!streak.lastDay) return 0;
+  const today = dayKey(now);
+  const yesterday = dayKey(now - 86_400_000);
+  return streak.lastDay === today || streak.lastDay === yesterday ? streak.count : 0;
+}
+
+function advanceStreak(prev: Streak, now = Date.now()): Streak {
+  const today = dayKey(now);
+  if (prev.lastDay === today) return prev;
+  const yesterday = dayKey(now - 86_400_000);
+  return { count: prev.lastDay === yesterday ? prev.count + 1 : 1, lastDay: today };
+}
+
+function setStreak(update: (prev: Streak) => Streak) {
   state = { ...state, streak: update(state.streak) };
   emit();
   if (state.loaded) saveJSON(KEYS.STREAK, state.streak);
@@ -33,8 +59,11 @@ function setStreak(update: (prev: number) => number) {
 function loadOnce() {
   if (!loadPromise) {
     loadPromise = (async () => {
-      const [saved, savedStreak] = await Promise.all([loadJSON<Task[]>(KEYS.TASKS), loadJSON<number>(KEYS.STREAK)]);
-      state = { tasks: saved ?? [], streak: savedStreak ?? 0, loaded: true };
+      const [saved, savedStreak] = await Promise.all([loadJSON<Task[]>(KEYS.TASKS), loadJSON<Streak | number>(KEYS.STREAK)]);
+      // Older builds stored a plain strike count under this key. It was never a
+      // day streak, so it starts over rather than pretending.
+      const streak = savedStreak && typeof savedStreak === 'object' && typeof savedStreak.count === 'number' ? savedStreak : NO_STREAK;
+      state = { tasks: Array.isArray(saved) ? saved : [], streak, loaded: true };
       emit();
     })();
   }
@@ -50,8 +79,9 @@ export function addTask(text: string, difficulty: 'normal' | 'hard' = 'normal') 
 }
 
 export function completeTask(id: string) {
-  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true, completedAt: Date.now() } : t)));
-  setStreak((s) => s + 1);
+  const now = Date.now();
+  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true, completedAt: now } : t)));
+  setStreak((s) => advanceStreak(s, now));
 }
 
 export function uncompleteTask(id: string) {
@@ -64,6 +94,18 @@ export function deleteTask(id: string) {
       .filter((t) => t.id !== id)
       .map((t) => (t.after?.includes(id) ? { ...t, after: t.after.filter((a) => a !== id) } : t)),
   );
+}
+
+/** Put a deleted stop back where it was (Undo). Links it had are gone; its own `after` is kept. */
+export function restoreTask(task: Task, index: number) {
+  setTasks((prev) => {
+    if (prev.some((t) => t.id === task.id)) return prev;
+    const ids = new Set(prev.map((t) => t.id));
+    const restored: Task = { ...task, after: task.after?.filter((a) => ids.has(a)) };
+    const next = [...prev];
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, restored);
+    return next;
+  });
 }
 
 export function editTask(id: string, text: string) {
@@ -87,16 +129,41 @@ export function placeTasks(positions: Record<string, { x: number; y: number }>) 
   setTasks((prev) => prev.map((t) => (positions[t.id] && !t.pos ? { ...t, pos: positions[t.id] } : t)));
 }
 
+/** True if `target` is reachable from `startId` by walking `after` upstream. */
+function reaches(tasks: Task[], startId: string, target: string): boolean {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const seen = new Set<string>();
+  const stack = [startId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === target) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const up of byId.get(id)?.after ?? []) stack.push(up);
+  }
+  return false;
+}
+
 /**
  * Toggle "`toId` comes after `fromId`". Linking the other way round first
- * removes the reverse edge, so two stops are never mutually blocked.
+ * removes the reverse edge, so two stops are never mutually blocked, and a
+ * link that would close a longer loop (A→B→C→A) is refused.
  */
-export function toggleLink(fromId: string, toId: string) {
-  if (fromId === toId) return;
-  setTasks((prev) => {
-    const to = prev.find((t) => t.id === toId);
-    const exists = to?.after?.includes(fromId) ?? false;
-    return prev.map((t) => {
+export function toggleLink(fromId: string, toId: string): 'linked' | 'unlinked' | 'refused' {
+  if (fromId === toId) return 'refused';
+  const prev = state.tasks;
+  const to = prev.find((t) => t.id === toId);
+  const fromTask = prev.find((t) => t.id === fromId);
+  if (!to || !fromTask) return 'refused';
+  const exists = to.after?.includes(fromId) ?? false;
+  if (!exists) {
+    // Adding fromId upstream of toId: refuse if toId is already upstream of
+    // fromId through anything other than the direct reverse edge we strip.
+    const indirect = (fromTask.after ?? []).filter((a) => a !== toId);
+    if (indirect.some((a) => reaches(prev, a, toId))) return 'refused';
+  }
+  setTasks((cur) =>
+    cur.map((t) => {
       if (t.id === toId) {
         const after = (t.after ?? []).filter((a) => a !== fromId);
         return { ...t, after: exists ? after : [...after, fromId] };
@@ -105,8 +172,9 @@ export function toggleLink(fromId: string, toId: string) {
         return { ...t, after: t.after.filter((a) => a !== toId) };
       }
       return t;
-    });
-  });
+    }),
+  );
+  return exists ? 'unlinked' : 'linked';
 }
 
 /** Replace everything (developer: sample data / reset). Streak is kept. */
@@ -148,6 +216,7 @@ export function useTasks() {
       completeTask,
       uncompleteTask,
       deleteTask,
+      restoreTask,
       editTask,
       setTaskSize,
       setTaskLine,
@@ -164,7 +233,7 @@ export function useTasks() {
     tasks: snapshot.tasks,
     activeTasks,
     completedTasks,
-    streak: snapshot.streak,
+    streak: currentStreak(snapshot.streak),
     loaded: snapshot.loaded,
     ...ops,
   };

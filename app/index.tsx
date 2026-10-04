@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Platform, FlatList } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { FlatList } from 'react-native-gesture-handler';
 import { Redirect, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -7,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useStrikeFlow } from '../hooks/useStrikeFlow';
+import { useDayTick } from '../hooks/useDayTick';
 import { buildSampleTasks } from '../lib/sampleData';
 import { TaskItem } from '../components/TaskItem';
 import { AddTaskInput } from '../components/AddTaskInput';
@@ -31,6 +33,7 @@ export default function HomeScreen() {
     loaded,
     addTask,
     deleteTask,
+    restoreTask,
     editTask,
     setTaskSize,
     setTaskLine,
@@ -49,8 +52,11 @@ export default function HomeScreen() {
     stats,
     onStrike,
     onComplete,
+    showToast,
   } = useStrikeFlow();
   const [showCompleted, setShowCompleted] = useState(false);
+  // "Today" moves at midnight and on foregrounding; the header follows.
+  const day = useDayTick();
 
   const handleComplete = useCallback(
     (id: string, size: Parameters<typeof onComplete>[1]) => {
@@ -78,7 +84,35 @@ export default function HomeScreen() {
   const handleClearCompleted = useCallback(() => {
     animateNextLayout(reduceMotion);
     clearCompleted();
+    setShowCompleted(false);
   }, [clearCompleted, reduceMotion]);
+
+  // A swipe is quick and the row is gone; give it a few seconds of regret.
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const handleDelete = useCallback(
+    (id: string) => {
+      const list = tasksRef.current;
+      const index = list.findIndex((t) => t.id === id);
+      const task = list[index];
+      deleteTask(id);
+      if (!task) return;
+      const short = task.text.length > 28 ? task.text.slice(0, 28) + '…' : task.text;
+      showToast({
+        title: 'Deleted',
+        subtitle: `${short} · Tap to undo`,
+        icon: 'arrow.uturn.backward',
+        tint: theme.textSecondary,
+        hint: 'Puts the stop back',
+        durationMs: 4200,
+        onPress: () => {
+          animateNextLayout(reduceMotion);
+          restoreTask(task, index);
+        },
+      });
+    },
+    [deleteTask, restoreTask, showToast, theme.textSecondary, reduceMotion],
+  );
 
   const upstreamFor = useCallback(
     (t: Task) => {
@@ -97,17 +131,18 @@ export default function HomeScreen() {
         reduceMotion={reduceMotion}
         onStrike={onStrike}
         onComplete={handleComplete}
-        onDelete={deleteTask}
+        onDelete={handleDelete}
         onEdit={editTask}
         onSize={setTaskSize}
         onLine={setTaskLine}
         upstream={upstreamFor(item)}
       />
     ),
-    [settings, reduceMotion, onStrike, handleComplete, deleteTask, editTask, setTaskSize, setTaskLine, upstreamFor],
+    [settings, reduceMotion, onStrike, handleComplete, handleDelete, editTask, setTaskSize, setTaskLine, upstreamFor],
   );
 
-  const route = useMemo(() => buildRoute(tasks), [tasks]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const route = useMemo(() => buildRoute(tasks), [tasks, day]);
 
   if (!loaded || !settingsLoaded) return null;
   if (!rawSettings.onboarded) return <Redirect href="/onboarding" />;
@@ -202,7 +237,7 @@ export default function HomeScreen() {
           adjustsFontSizeToFit
           accessibilityRole="header"
         >
-          {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : 'End of the line.'}
+          {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : boardClear ? 'End of the line.' : 'Where to today?'}
         </Text>
         <DailyRoute tasks={tasks} streak={streak} variant="inline" />
       </View>
@@ -248,7 +283,7 @@ export default function HomeScreen() {
     replaceTasks(buildSampleTasks());
   };
   const sampleLink = (
-    <PressableScale style={styles.sampleLink} onPress={loadSample} pressStyle="scale" accessibilityRole="button">
+    <PressableScale style={[styles.sampleLink, !signal && styles.sampleLinkCenter]} onPress={loadSample} pressStyle="scale" accessibilityRole="button">
       <Text style={[styles.sampleLinkText, { color: theme.blue }]} maxFontSizeMultiplier={1.3}>
         Try it with 20 sample stops
       </Text>
@@ -571,6 +606,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingVertical: 6,
     alignSelf: 'flex-start',
+  },
+  sampleLinkCenter: {
+    alignSelf: 'center',
+    marginTop: 6,
   },
   sampleLinkText: {
     fontSize: 14,

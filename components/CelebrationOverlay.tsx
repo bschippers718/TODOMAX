@@ -52,7 +52,7 @@ export function CelebrationOverlay({
   // the whole screen — a small window never reads as a reward.
 
   return (
-    <Pressable style={styles.overlay} onPress={onDismiss} accessibilityLabel="Celebration, tap to skip">
+    <Pressable style={styles.overlay} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Celebration, tap to skip">
       <Animated.View
         style={[styles.backdrop, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.42)' : 'rgba(34, 31, 26, 0.16)' }]}
         exiting={FadeOut.duration(180)}

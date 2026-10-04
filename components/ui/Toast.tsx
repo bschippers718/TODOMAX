@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -20,6 +20,10 @@ export interface ToastMessage {
   tint?: string;
   /** Tapping the toast. The toast dismisses itself right after. */
   onPress?: () => void;
+  /** What tapping does, for VoiceOver. */
+  hint?: string;
+  /** How long it stays up. Longer for anything the user might want to act on. */
+  durationMs?: number;
 }
 
 const SHOW_MS = 2200;
@@ -39,7 +43,9 @@ export function useToast() {
     if (timer.current) clearTimeout(timer.current);
     setMsg(m);
     setKey((k) => k + 1);
-    timer.current = setTimeout(() => setMsg(null), SHOW_MS + 500);
+    timer.current = setTimeout(() => setMsg(null), (m.durationMs ?? SHOW_MS) + 500);
+    // iOS has no live regions; say it out loud.
+    AccessibilityInfo.announceForAccessibility(m.subtitle ? `${m.title}. ${m.subtitle}` : m.title);
   }, []);
 
   const hide = useCallback(() => {
@@ -60,12 +66,13 @@ function Toast({ message, onDismiss }: { message: ToastMessage; onDismiss: () =>
   const insets = useSafeAreaInsets();
   const progress = useSharedValue(0);
 
+  const showMs = message.durationMs ?? SHOW_MS;
   useEffect(() => {
     progress.value = withSequence(
       withSpring(1, { damping: 18, stiffness: 240, mass: 0.8 }),
-      withDelay(SHOW_MS, withTiming(0, { duration: 260, easing: Easing.in(Easing.cubic) })),
+      withDelay(showMs, withTiming(0, { duration: 260, easing: Easing.in(Easing.cubic) })),
     );
-  }, [progress]);
+  }, [progress, showMs]);
 
   const style = useAnimatedStyle(() => ({
     opacity: progress.value,
@@ -88,7 +95,7 @@ function Toast({ message, onDismiss }: { message: ToastMessage; onDismiss: () =>
           onDismiss();
         }}
         accessibilityRole={press ? 'button' : undefined}
-        accessibilityHint={press ? 'Opens your Collection' : undefined}
+        accessibilityHint={press ? message.hint ?? 'Opens your Collection' : undefined}
         style={[
           styles.pill,
           theme.isSignal ? theme.shadowControl : styles.pillSoft,

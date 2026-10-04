@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-nat
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSharedValue } from 'react-native-reanimated';
+import { useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useStrikeFlow } from '../hooks/useStrikeFlow';
@@ -24,13 +24,15 @@ export default function MapScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width: W, height: H } = useWindowDimensions();
-  const { activeTasks, loaded, addTask, moveTask, placeTasks, toggleLink } = useTasks();
+  const { activeTasks, completedTasks, loaded, addTask, moveTask, placeTasks, toggleLink } = useTasks();
   const { settings, reduceMotion, celebration, celebrationSettings, dismissCelebration, toast, onStrike, onComplete } = useStrikeFlow();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
+  // The board's on-screen size (below the header, above the composer).
+  const board = useRef({ width: W, height: H - insets.top - 160 });
 
   // First visit (or new stops added from the list): give unplaced stops a spot.
   useEffect(() => {
@@ -39,6 +41,39 @@ export default function MapScreen() {
     if (Object.keys(placed).length) placeTasks(placed);
   }, [loaded, activeTasks, placeTasks]);
 
+  // Bring every placed stop into view. Instant on open, animated from the button.
+  const fitToBoard = useCallback(
+    (animated: boolean) => {
+      const placed = activeTasks.filter((t) => t.pos);
+      if (placed.length === 0) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const t of placed) {
+        const w = CARD_WIDTH[t.size ?? 'm'];
+        minX = Math.min(minX, t.pos!.x);
+        minY = Math.min(minY, t.pos!.y);
+        maxX = Math.max(maxX, t.pos!.x + w);
+        maxY = Math.max(maxY, t.pos!.y + 90);
+      }
+      const pad = 20;
+      const availW = board.current.width - pad * 2;
+      const availH = board.current.height - pad * 2;
+      const s = Math.min(1, Math.max(0.5, Math.min(availW / (maxX - minX), availH / (maxY - minY))));
+      const nextTx = pad - minX * s + Math.max(0, (availW - (maxX - minX) * s) / 2);
+      const nextTy = pad - minY * s + Math.max(0, (availH - (maxY - minY) * s) / 2);
+      if (animated && !reduceMotion) {
+        const cfg = { duration: 360, easing: Easing.out(Easing.cubic) };
+        scale.value = withTiming(s, cfg);
+        tx.value = withTiming(nextTx, cfg);
+        ty.value = withTiming(nextTy, cfg);
+      } else {
+        scale.value = s;
+        tx.value = nextTx;
+        ty.value = nextTy;
+      }
+    },
+    [activeTasks, reduceMotion, scale, tx, ty],
+  );
+
   // Open fitted to whatever's on the board, once. After that the viewport is yours.
   const fitted = useRef(false);
   useEffect(() => {
@@ -46,29 +81,23 @@ export default function MapScreen() {
     const placed = activeTasks.filter((t) => t.pos);
     if (placed.length === 0 || placed.length < activeTasks.length) return;
     fitted.current = true;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const t of placed) {
-      const w = CARD_WIDTH[t.size ?? 'm'];
-      minX = Math.min(minX, t.pos!.x);
-      minY = Math.min(minY, t.pos!.y);
-      maxX = Math.max(maxX, t.pos!.x + w);
-      maxY = Math.max(maxY, t.pos!.y + 90);
-    }
-    const pad = 20;
-    const availW = W - pad * 2;
-    const availH = H - insets.top - 160 - pad * 2;
-    const s = Math.min(1, Math.max(0.65, Math.min(availW / (maxX - minX), availH / (maxY - minY))));
-    scale.value = s;
-    tx.value = pad - minX * s + Math.max(0, (availW - (maxX - minX) * s) / 2);
-    ty.value = pad - minY * s;
-  }, [loaded, activeTasks, W, H, insets.top, scale, tx, ty]);
+    fitToBoard(false);
+  }, [loaded, activeTasks, fitToBoard]);
+
+  // A selected stop that gets struck or deleted elsewhere shouldn't stay "selected".
+  useEffect(() => {
+    if (selectedId && !activeTasks.some((t) => t.id === selectedId)) setSelectedId(null);
+  }, [activeTasks, selectedId]);
 
   // Tap one stop, then another: the second comes after the first.
   const handleSelect = useCallback(
     (id: string | null) => {
       if (id && selectedId && id !== selectedId) {
-        if (settings.hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        toggleLink(selectedId, id);
+        const result = toggleLink(selectedId, id);
+        if (settings.hapticsEnabled) {
+          if (result === 'refused') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
         setSelectedId(null);
         return;
       }
@@ -83,11 +112,11 @@ export default function MapScreen() {
       const task = addTask(text);
       const s = scale.value;
       moveTask(task.id, {
-        x: (W / 2 - tx.value) / s - CARD_WIDTH.m / 2,
-        y: (H / 2 - ty.value) / s - 30,
+        x: (board.current.width / 2 - tx.value) / s - CARD_WIDTH.m / 2,
+        y: (board.current.height / 2 - ty.value) / s - 30,
       });
     },
-    [addTask, moveTask, W, H, tx, ty, scale],
+    [addTask, moveTask, tx, ty, scale],
   );
 
   const handleComplete = useCallback(
@@ -120,7 +149,7 @@ export default function MapScreen() {
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <PressableScale
             style={styles.back}
-            onPress={() => router.back()}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
             pressStyle="scale"
             pressedScale={0.94}
             hitSlop={8}
@@ -134,10 +163,25 @@ export default function MapScreen() {
           </PressableScale>
           <View style={styles.headerMid}>
             <Text style={[styles.title, signal ? theme.fontDisplay : styles.titleClassic, { color: theme.text }]} maxFontSizeMultiplier={1.2} numberOfLines={1}>
-              {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : 'End of the line.'}
+              {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : completedTasks.length > 0 ? 'End of the line.' : 'Where to today?'}
             </Text>
           </View>
-          <View style={styles.back} />
+          <PressableScale
+            style={[styles.back, styles.fit]}
+            onPress={() => {
+              if (settings.hapticsEnabled) Haptics.selectionAsync();
+              fitToBoard(true);
+            }}
+            pressStyle="scale"
+            pressedScale={0.94}
+            hitSlop={8}
+            disabled={remaining === 0}
+            accessibilityRole="button"
+            accessibilityLabel="Show all stops"
+            accessibilityHint="Zooms the Map so every stop is on screen"
+          >
+            <Symbol name="arrow.down.left.and.arrow.up.right" size={15} color={remaining === 0 ? theme.textTertiary : theme.textSecondary} weight="bold" />
+          </PressableScale>
         </View>
         <Text style={[styles.hint, { color: selectedTask ? theme.blue : theme.textTertiary }]} maxFontSizeMultiplier={1.2} numberOfLines={1}>
           {hint}
@@ -154,6 +198,9 @@ export default function MapScreen() {
           onStrike={onStrike}
           onComplete={handleComplete}
           viewport={{ tx, ty, scale }}
+          onViewportLayout={(size) => {
+            board.current = size;
+          }}
         />
 
         <AddTaskInput onAdd={handleAdd} hapticsEnabled={settings.hapticsEnabled} />
@@ -180,6 +227,9 @@ const styles = StyleSheet.create({
     gap: 2,
     minWidth: 64,
     paddingVertical: 8,
+  },
+  fit: {
+    justifyContent: 'flex-end',
   },
   backText: {
     fontSize: 16,

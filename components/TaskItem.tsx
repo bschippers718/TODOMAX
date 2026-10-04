@@ -12,6 +12,7 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedReaction,
   withTiming,
   withDelay,
   withSpring,
@@ -125,14 +126,19 @@ function TaskItemInner({
 
   const hapticsEnabled = settings.hapticsEnabled;
 
-  const fireComplete = useCallback(() => onComplete(task.id, size), [task.id, onComplete, size]);
-  const fireDelete = useCallback(() => onDelete(task.id), [task.id, onDelete]);
+  // Worklets and the VoiceOver handler are built once per row; they call
+  // through these so a size change or new handler is never missed.
+  const latest = useRef({ onComplete, onDelete, onStrike, size, hapticsEnabled });
+  latest.current = { onComplete, onDelete, onStrike, size, hapticsEnabled };
+
+  const fireComplete = useCallback(() => latest.current.onComplete(task.id, latest.current.size), [task.id]);
+  const fireDelete = useCallback(() => latest.current.onDelete(task.id), [task.id]);
   const fireStrike = useCallback(() => {
     // The "it's done" moment is a success notification, not a thud.
-    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (latest.current.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setStruck(true);
-    onStrike?.(task.id);
-  }, [task.id, onStrike, hapticsEnabled]);
+    latest.current.onStrike?.(task.id);
+  }, [task.id]);
   const firePenDown = useCallback(() => {
     // Pen touches paper.
     if (hapticsEnabled) Haptics.selectionAsync();
@@ -154,11 +160,16 @@ function TaskItemInner({
     if (!onEdit) return;
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setDraft(task.text);
+    editingRef.current = true;
     setEditing(true);
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [onEdit, hapticsEnabled, task.text]);
 
+  const editingRef = useRef(false);
   const commitEdit = useCallback(() => {
+    // Return and the blur it causes both land here; commit once.
+    if (!editingRef.current) return;
+    editingRef.current = false;
     const trimmed = draft.trim();
     setEditing(false);
     if (trimmed && trimmed !== task.text) onEdit?.(task.id, trimmed);
@@ -208,8 +219,9 @@ function TaskItemInner({
       const lx = p[(n - 1) * 3];
       const ly = p[(n - 1) * 3 + 1];
       const d = Math.sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly));
+      // The first two samples arrive in the same tick; treat them as unhurried.
       const dt = Math.max(1, now - lastT.value);
-      const speed = d / dt;
+      const speed = n === 1 ? 0 : d / dt;
       const target = penBase * Math.min(PEN_MAX, Math.max(PEN_MIN, PEN_MAX - 0.3 * speed));
       w = w * 0.55 + target * 0.45;
       inkLength.value += d;
@@ -249,8 +261,11 @@ function TaskItemInner({
 
   const panGesture = Gesture.Pan()
     .enabled(!editing)
+    .maxPointers(1)
     .activeOffsetX([-10, 10])
-    .failOffsetY([-10, 10])
+    // A scribble rarely starts dead horizontal; give it a little slack
+    // before the list claims the touch as a scroll.
+    .failOffsetY([-14, 14])
     .onStart((e) => {
       if (committed.value) return;
       if (e.translationX < 0) {
@@ -304,7 +319,13 @@ function TaskItemInner({
         }
       }
     })
-    .onFinalize(() => {
+    .onFinalize((_e, success) => {
+      // Cancelled mid-stroke (system gesture, call banner, second finger):
+      // onEnd never ran, so put the row back ourselves.
+      if (!success && !committed.value) {
+        if (mode.value === MODE_INK) liftInk();
+        else if (mode.value === MODE_SLIDE) translateX.value = withSpring(0, SPRING_BACK);
+      }
       mode.value = MODE_NONE;
     });
 
@@ -348,12 +369,16 @@ function TaskItemInner({
   const deleteBgStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-24, -DELETE_THRESHOLD * 0.6], [0, 1], Extrapolation.CLAMP),
   }));
-  const trashStyle = useAnimatedStyle(() => {
-    const isArmed = translateX.value <= -DELETE_THRESHOLD;
-    return {
-      transform: [{ scale: withSpring(isArmed ? 1.25 : 1, IOS_SPRING) }],
-    };
-  });
+  const trashScale = useSharedValue(1);
+  useAnimatedReaction(
+    () => translateX.value <= -DELETE_THRESHOLD,
+    (isArmed, was) => {
+      if (isArmed !== was) trashScale.value = withSpring(isArmed ? 1.25 : 1, IOS_SPRING);
+    },
+  );
+  const trashStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: trashScale.value }],
+  }));
 
   const textAnimStyle = useAnimatedStyle(() => ({ opacity: textOpacity.value }));
 
@@ -401,7 +426,7 @@ function TaskItemInner({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [beginEdit],
+    [beginEdit, task.id],
   );
 
   const radius = { borderRadius: theme.radiusCard };
@@ -432,7 +457,8 @@ function TaskItemInner({
           style={[
             styles.card,
             radius,
-            theme.shadowCard,
+            signal && theme.shadowCard,
+            size === 's' ? styles.cardSmall : styles.cardRegular,
             {
               backgroundColor: theme.surface,
               borderWidth: theme.borderWidth,
@@ -444,7 +470,8 @@ function TaskItemInner({
           accessible={!editing}
           accessibilityRole="button"
           accessibilityLabel={task.text}
-          accessibilityHint="Scratch across to complete, swipe left to delete, hold to edit"
+          accessibilityHint={struck ? undefined : 'Actions available'}
+          accessibilityState={{ busy: struck }}
           accessibilityActions={[
             { name: 'complete', label: 'Complete' },
             { name: 'delete', label: 'Delete' },
@@ -555,7 +582,7 @@ function EditTray({
                 onPress={() => onSize(s)}
                 hitSlop={6}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
+                accessibilityState={{ checked: on }}
                 accessibilityLabel={TASK_SIZE_LABEL[s]}
                 style={[
                   styles.sizeChip,
@@ -585,7 +612,7 @@ function EditTray({
             onPress={() => onLine(undefined)}
             hitSlop={6}
             accessibilityRole="radio"
-            accessibilityState={{ selected: !line }}
+            accessibilityState={{ checked: !line }}
             accessibilityLabel="No line"
             style={[styles.swatch, styles.swatchNone, { borderColor: !line ? theme.text : theme.textTertiary }]}
           >
@@ -599,7 +626,7 @@ function EditTray({
                 onPress={() => onLine(l.id)}
                 hitSlop={6}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
+                accessibilityState={{ checked: on }}
                 accessibilityLabel={`${l.name} line`}
                 style={[
                   styles.swatch,
@@ -636,8 +663,12 @@ const styles = StyleSheet.create({
     right: 4,
     bottom: 4,
   },
-  card: {
+  card: {},
+  cardRegular: {
     minHeight: 58,
+  },
+  cardSmall: {
+    minHeight: 46,
   },
   // Room for the hard shadow so it isn't clipped by the row container.
   cardSignal: {
@@ -646,7 +677,6 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flex: 1,
-    minHeight: 56,
     justifyContent: 'center',
     overflow: 'hidden',
   },
@@ -702,7 +732,6 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   cardInnerSmall: {
-    minHeight: 42,
     paddingVertical: 9,
   },
   cardInnerBig: {

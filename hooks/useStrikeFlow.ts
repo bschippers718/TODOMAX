@@ -17,6 +17,10 @@ import { completeTask, useTasks } from './useTasks';
 // Matches CelebrationOverlay's cap for the minimal variant.
 export const MINIMAL_VISUAL_MS = 1100;
 
+// One cooldown for the whole app: striking on the Map and then on the list is
+// still rapid fire.
+let cooldownUntil = 0;
+
 /**
  * Celebrations in rotation: owned packs, narrowed to the ones the user chose
  * to play from. Never empty — if the filter would leave nothing, fall back to
@@ -47,7 +51,7 @@ export function useStrikeFlow() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const { settings: rawSettings } = useSettings();
-  const { streak } = useTasks();
+  const { tasks } = useTasks();
   const pool = useCelebrationPool();
 
   // Reduce Motion caps celebrations at "minimal" regardless of the user's pick.
@@ -62,7 +66,6 @@ export function useStrikeFlow() {
   // Rapid-fire and late-night protection: the celebration still counts (it's
   // recorded in the Collection) but plays as a glimpse instead of a movie.
   const [damped, setDamped] = useState(false);
-  const cooldownUntil = useRef(0);
   const celebrationSettings: Settings = useMemo(
     () => (damped && settings.animationMode === 'full' ? { ...settings, animationMode: 'minimal' } : settings),
     [damped, settings],
@@ -91,17 +94,20 @@ export function useStrikeFlow() {
       const now = Date.now();
       // Size decides the weight of the moment. A big stop always gets the
       // movie (quiet hours still win); a small one is always a glimpse.
-      const inCooldown = now < cooldownUntil.current;
+      const inCooldown = now < cooldownUntil;
       const quiet = isQuietHour(settings) || size === 's' || (inCooldown && size !== 'l');
       setDamped(quiet);
 
-      const animId = triggerCelebration(streak + 1);
+      // Today's tally including this one; Streak Combo shows it as the combo count.
+      const dayStart = new Date(now).setHours(0, 0, 0, 0);
+      const struckToday = tasks.filter((t) => t.completed && (t.completedAt ?? 0) >= dayStart && t.id !== id).length + 1;
+      const animId = triggerCelebration(struckToday);
       if (!animId) return;
       playCelebration(animId);
 
       const fullMs = ANIMATION_DURATIONS[animId];
       const visualMs = quiet || settings.animationMode === 'minimal' ? Math.min(fullMs, MINIMAL_VISUAL_MS) : fullMs;
-      cooldownUntil.current = now + visualMs + CELEBRATION_COOLDOWN_MS;
+      cooldownUntil = now + visualMs + CELEBRATION_COOLDOWN_MS;
 
       // Add it to the board. First time? Say so once the movie has finished.
       const isFirst = recordEarned(animId);
@@ -119,7 +125,7 @@ export function useStrikeFlow() {
         }, visualMs + 450);
       }
     },
-    [triggerCelebration, streak, playCelebration, recordEarned, showToast, theme.isSignal, settings, router],
+    [triggerCelebration, tasks, playCelebration, recordEarned, showToast, theme.isSignal, settings, router],
   );
 
   return {
@@ -133,5 +139,6 @@ export function useStrikeFlow() {
     stats,
     onStrike,
     onComplete,
+    showToast,
   };
 }

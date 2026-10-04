@@ -1,5 +1,9 @@
 import { Alert, Image, View, Text, StyleSheet, Switch, ScrollView, Platform, Linking } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Stack, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import * as Haptics from 'expo-haptics';
 import { useSettings } from '../hooks/useSettings';
@@ -8,10 +12,13 @@ import { useCollection } from '../hooks/useCollection';
 import { useTasks } from '../hooks/useTasks';
 import { buildSampleTasks } from '../lib/sampleData';
 import { PACKS } from '../lib/packs';
+import { BACKGROUNDS_DIR, deleteBackgroundFile, newBackgroundPath, resolveBackgroundUri } from '../lib/background';
 import { useTheme, Theme } from '../lib/theme';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { HeaderDone } from '../components/ui/HeaderDone';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0';
 
 function OptionRow<T extends string>({
   label,
@@ -63,7 +70,8 @@ export default function SettingsScreen() {
     const go = () => {
       if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       replaceTasks(buildSampleTasks());
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
     };
     if (tasks.length === 0) return go();
     Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 20 open and 4 struck.`, [
@@ -74,44 +82,51 @@ export default function SettingsScreen() {
   const clearAll = () => {
     Alert.alert('Clear all stops?', 'Open and struck. The streak and Collection stay.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => replaceTasks([]) },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          replaceTasks([]);
+        },
+      },
     ]);
   };
   const ownedCount = PACKS.filter((p) => isOwned(p.id)).length;
 
   const pickBackground = async () => {
-    let ImagePicker: typeof import('expo-image-picker');
-    let FileSystem: typeof import('expo-file-system/legacy');
+    // iOS uses the system photo picker, which needs no library permission.
+    if (Platform.OS !== 'ios') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photo access needed',
+          'Allow photo access to choose a custom ToDOMax background.',
+          permission.canAskAgain
+            ? [{ text: 'OK' }]
+            : [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }],
+        );
+        return;
+      }
+    }
 
+    let result: ImagePicker.ImagePickerResult;
     try {
-      [ImagePicker, FileSystem] = await Promise.all([
-        import('expo-image-picker'),
-        import('expo-file-system/legacy'),
-      ]);
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        // The photo is shown full-bleed with cover framing; a forced crop
+        // (square on iOS) would only throw away most of a portrait shot.
+        allowsEditing: Platform.OS !== 'ios',
+        aspect: [9, 16],
+        quality: 0.85,
+      });
     } catch {
       Alert.alert(
-        'Rebuild needed',
-        'The photo picker was added as a native module. Rebuild the iOS app once, then try choosing a background again.',
+        'Photo picker unavailable',
+        'The photo picker needs a rebuilt app. Rebuild once, then try choosing a background again.',
       );
       return;
     }
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
-        'Allow photo library access to choose a custom ToDOMax background.',
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 0.85,
-    });
 
     if (!result.canceled && result.assets[0]?.uri) {
       try {
@@ -126,13 +141,12 @@ export default function SettingsScreen() {
           throw new Error('Document directory unavailable');
         }
 
-        const directory = `${FileSystem.documentDirectory}backgrounds/`;
-        const destination = `${directory}custom-background.${extension}`;
-
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-        await FileSystem.deleteAsync(destination, { idempotent: true });
-        await FileSystem.copyAsync({ from: sourceUri, to: destination });
-        updateSetting('customBackgroundUri', destination);
+        const relative = newBackgroundPath(extension);
+        await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}${BACKGROUNDS_DIR}`, { intermediates: true });
+        await FileSystem.copyAsync({ from: sourceUri, to: `${FileSystem.documentDirectory}${relative}` });
+        const previous = settings.customBackgroundUri;
+        updateSetting('customBackgroundUri', relative);
+        if (previous) deleteBackgroundFile(previous);
       } catch {
         Alert.alert(
           'Background not saved',
@@ -141,6 +155,13 @@ export default function SettingsScreen() {
       }
     }
   };
+
+  const removeBackground = () => {
+    const previous = settings.customBackgroundUri;
+    updateSetting('customBackgroundUri', null);
+    if (previous) deleteBackgroundFile(previous);
+  };
+  const backgroundUri = resolveBackgroundUri(settings.customBackgroundUri);
 
   const signal = theme.isSignal;
   const card = [
@@ -201,11 +222,12 @@ export default function SettingsScreen() {
                 ? 'Signal runs on plain paper by default. You can still put a photo behind it; it will be washed back so the signs stay legible.'
                 : 'Choose a photo from your camera roll. ToDOMax will soften it behind the paper surface so tasks stay readable.'}
             </Text>
-            {settings.customBackgroundUri ? (
-              <Image
-                source={{ uri: settings.customBackgroundUri }}
+            {backgroundUri ? (
+              <ExpoImage
+                source={{ uri: backgroundUri }}
                 style={[styles.backgroundPreview, { borderColor: signal ? theme.cardBorder : theme.border, borderWidth: signal ? 2 : StyleSheet.hairlineWidth, borderRadius: theme.radiusCard }]}
-                resizeMode="cover"
+                contentFit="cover"
+                accessibilityLabel="Your background photo"
               />
             ) : (
               <View style={[styles.defaultPreview, { borderColor: signal ? theme.cardBorder : theme.border, borderWidth: signal ? 2 : StyleSheet.hairlineWidth, borderRadius: theme.radiusCard, backgroundColor: theme.bg }]}>
@@ -242,7 +264,7 @@ export default function SettingsScreen() {
                     { borderColor: signal ? theme.cardBorder : theme.borderStrong, borderWidth: signal ? theme.borderWidth : 1, backgroundColor: signal ? theme.surface : 'transparent' },
                     signal && styles.buttonSignal,
                   ]}
-                  onPress={() => updateSetting('customBackgroundUri', null)}
+                  onPress={removeBackground}
                 >
                   <Text style={[styles.backgroundButtonText, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
                     Remove
@@ -312,12 +334,13 @@ export default function SettingsScreen() {
                   Quiet hours
                 </Text>
                 <Text style={[styles.toggleHint, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
-                  Late at night, celebrations play as a glimpse, not a movie.
+                  Late at night until 6 AM, celebrations play as a glimpse, not a movie.
                 </Text>
               </View>
               <Switch
                 value={settings.quietHoursEnabled}
                 onValueChange={(val) => updateSetting('quietHoursEnabled', val)}
+                accessibilityLabel="Quiet hours"
                 {...(Platform.OS !== 'ios' && { trackColor: { false: theme.separator, true: theme.green } })}
               />
             </View>
@@ -368,6 +391,7 @@ export default function SettingsScreen() {
               <Switch
                 value={settings.hapticsEnabled}
                 onValueChange={(val) => updateSetting('hapticsEnabled', val)}
+                accessibilityLabel="Vibration feedback"
                 {...(Platform.OS !== 'ios' && { trackColor: { false: theme.separator, true: theme.green } })}
               />
             </View>
@@ -376,7 +400,7 @@ export default function SettingsScreen() {
 
         <View style={[styles.infoCard, { backgroundColor: signal ? 'transparent' : theme.surfaceSoft, borderRadius: theme.radiusCard }]}>
           <Text style={[styles.infoText, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-            Full mode plays a random celebration when you complete a task. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal. Strike several in a row and the follow-ups play short, so the movie never gets in your way.
+            Full mode plays a random celebration when you cross something off. Minimal reduces the effect. Off keeps the cross-out but skips the celebration. Reduce Motion in iOS Settings caps celebrations at Minimal. Strike several in a row and the follow-ups play short, so the movie never gets in your way.
           </Text>
         </View>
 
@@ -389,7 +413,7 @@ export default function SettingsScreen() {
                   Load sample stops
                 </Text>
                 <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                  20 open across every size and line, with links and Map positions, plus 4 struck today.
+                  A full day: 20 stops in every size and colour, a few that come after others, plus 4 already struck.
                 </Text>
               </View>
               <Symbol name="tray.and.arrow.down" size={16} color={theme.textTertiary} weight="semibold" />
@@ -406,27 +430,18 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v1.0</Text>
-          <Text style={[styles.footerText, { color: theme.textTertiary }]} accessible={false}>
-            Built with love by{' '}
-            <Text
-              style={[styles.footerName, { color: theme.textSecondary }]}
-              onPress={() => Linking.openURL('https://x.com/bschippers')}
-              accessibilityRole="link"
-              accessibilityLabel="@bschippers, opens X"
-            >
-              @bschippers
-            </Text>
-            {' & '}
-            <Text
-              style={[styles.footerName, { color: theme.textSecondary }]}
-              onPress={() => Linking.openURL('https://www.youtube.com/@maxjosephdirector')}
-              accessibilityRole="link"
-              accessibilityLabel="@maxjoseph, opens YouTube"
-            >
-              @maxjoseph
-            </Text>
-          </Text>
+          <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v{APP_VERSION}</Text>
+          {/* Separate pressables, so VoiceOver can reach each link. */}
+          <View style={styles.credits}>
+            <Text style={[styles.footerText, { color: theme.textTertiary }]}>Built with love by </Text>
+            <PressableScale onPress={() => Linking.openURL('https://x.com/bschippers')} pressStyle="scale" hitSlop={6} accessibilityRole="link" accessibilityLabel="@bschippers, opens X">
+              <Text style={[styles.footerText, styles.footerName, { color: theme.textSecondary }]}>@bschippers</Text>
+            </PressableScale>
+            <Text style={[styles.footerText, { color: theme.textTertiary }]}> & </Text>
+            <PressableScale onPress={() => Linking.openURL('https://www.youtube.com/@maxjosephdirector')} pressStyle="scale" hitSlop={6} accessibilityRole="link" accessibilityLabel="@maxjoseph, opens YouTube">
+              <Text style={[styles.footerText, styles.footerName, { color: theme.textSecondary }]}>@maxjoseph</Text>
+            </PressableScale>
+          </View>
         </View>
       </ScrollView>
     </>
@@ -582,5 +597,11 @@ const styles = StyleSheet.create({
   },
   footerName: {
     fontWeight: '600',
+  },
+  credits: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
 });

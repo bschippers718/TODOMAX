@@ -48,7 +48,9 @@ export function useSettings() {
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     currentSettings = { ...currentSettings, [key]: value };
     notifyListeners();
-    saveJSON(KEYS.SETTINGS, currentSettings);
+    // A write before load would clobber the saved file with defaults.
+    if (currentLoaded) saveJSON(KEYS.SETTINGS, currentSettings);
+    else loadSettingsOnce().then(() => saveJSON(KEYS.SETTINGS, currentSettings));
   }, []);
 
   return { settings, updateSetting, loaded };

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Task, TaskSize, taskSize } from '../lib/types';
 import { useTheme } from '../lib/theme';
+import { useDayTick } from '../hooks/useDayTick';
 
 type StopKind = 'done' | 'carried' | 'open';
 type Stop = { kind: StopKind; size: TaskSize };
@@ -60,7 +61,9 @@ interface Props {
 
 export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
   const theme = useTheme();
-  const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks]);
+  const day = useDayTick();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks, day]);
   const colorFor = (s: Stop) => (s.kind === 'done' ? theme.green : s.kind === 'carried' ? theme.orange : 'transparent');
   // A big stop is a wider square; a small one is a little narrower.
   const widthFor = (s: Stop, base: number) => (s.size === 'l' ? Math.round(base * 1.7) : s.size === 's' ? Math.round(base * 0.75) : base);
@@ -166,11 +169,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     minHeight: 12,
+    flexShrink: 1,
+    overflow: 'hidden',
   },
   inlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexShrink: 1,
+    overflow: 'hidden',
   },
   inlineSquare: {
     width: 11,

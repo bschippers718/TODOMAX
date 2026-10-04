@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useTheme } from '../lib/theme';
+import { resolveBackgroundUri } from '../lib/background';
 
-export function AppBackground({ imageUri }: { imageUri?: string | null }) {
+export function AppBackground({ imageUri: stored }: { imageUri?: string | null }) {
   const theme = useTheme();
   const { width: SW, height: SH } = useWindowDimensions();
   const [imageFailed, setImageFailed] = useState(false);
+  const imageUri = resolveBackgroundUri(stored);
   const showCustomImage = Boolean(imageUri && !imageFailed);
 
   useEffect(() => {
@@ -20,10 +22,10 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
         <View style={[styles.base, { backgroundColor: theme.bg }]} />
         {showCustomImage ? (
           <>
-            <Image
+            <ExpoImage
               source={{ uri: imageUri! }}
               style={styles.customImage}
-              resizeMode="cover"
+              contentFit="cover"
               onError={() => setImageFailed(true)}
             />
             <View
@@ -42,10 +44,10 @@ export function AppBackground({ imageUri }: { imageUri?: string | null }) {
     <View pointerEvents="none" style={styles.container}>
       {showCustomImage ? (
         <>
-          <Image
+          <ExpoImage
             source={{ uri: imageUri! }}
             style={styles.customImage}
-            resizeMode="cover"
+            contentFit="cover"
             onError={() => setImageFailed(true)}
           />
           <View

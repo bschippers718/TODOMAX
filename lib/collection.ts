@@ -101,7 +101,8 @@ export function getCollectionStats(state: CollectionState, unlockedIds: Animatio
     if (e) {
       earned += 1;
       if (e.firstAt > state.lastViewedAt) fresh += 1;
-    } else if (state.previewed[id]) {
+    } else if (state.previewed[id] && unlocked.has(id)) {
+      // A locked pack can be previewed from the store, but its tiles read "locked".
       previewed += 1;
     }
   }

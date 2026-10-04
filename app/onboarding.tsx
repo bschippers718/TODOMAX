@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useSettings } from '../hooks/useSettings';
@@ -36,8 +36,13 @@ export default function OnboardingScreen() {
   };
 
   const togglePack = (id: PackId) => {
+    // The last pack stays: something has to play. Say so instead of pretending.
+    if (picked.includes(id) && picked.length === 1) {
+      if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
     haptic();
-    setPicked((prev) => (prev.includes(id) ? (prev.length > 1 ? prev.filter((p) => p !== id) : prev) : [...prev, id]));
+    setPicked((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   };
 
   const start = () => {
@@ -49,6 +54,9 @@ export default function OnboardingScreen() {
   };
 
   const signal = theme.isSignal;
+
+  // Already set up (reached by a link): there's nothing to redo here.
+  if (settings.onboarded) return <Redirect href="/" />;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -197,7 +205,7 @@ function LookCard({
       pressStyle="scale"
       pressedScale={0.985}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ checked: selected }}
       accessibilityLabel={`${name} look`}
       style={[
         styles.look,

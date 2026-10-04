@@ -35,7 +35,9 @@ function jitter(id: string, salt: number): number {
 /** Positions for tasks that have never been placed. */
 export function autoPlace(tasks: Task[]): Positions {
   const out: Positions = {};
-  let slot = 0;
+  // Fill forward from the end of the existing board so a stop added later
+  // from the list doesn't land on top of the first card.
+  let slot = tasks.filter((t) => t.pos).length;
   for (const t of tasks) {
     if (t.pos) continue;
     const col = slot % GRID.cols;
@@ -61,29 +63,41 @@ interface Props {
   onComplete: (id: string, size: TaskSize) => void;
   /** Exposed so the screen can drop new stops at the viewport centre. */
   viewport: { tx: SharedValue<number>; ty: SharedValue<number>; scale: SharedValue<number> };
+  /** The visible board's size on screen, so the screen can aim for its centre. */
+  onViewportLayout?: (size: { width: number; height: number }) => void;
 }
 
-export function MapCanvas({ tasks, theme, haptics, reduceMotion, selectedId, onSelect, onMove, onStrike, onComplete, viewport }: Props) {
+export function MapCanvas({ tasks, theme, haptics, reduceMotion, selectedId, onSelect, onMove, onStrike, onComplete, viewport, onViewportLayout }: Props) {
   const { tx, ty, scale } = viewport;
   const positions = useSharedValue<Positions>({});
   const dims = useSharedValue<Dims>({});
   const dragging = useSharedValue<string | null>(null);
 
   // Mirror store positions into the shared map, except for the card in hand.
+  // Done on the UI thread so it can't race a drag frame or another write.
   useEffect(() => {
-    const next: Positions = { ...positions.value };
-    for (const t of tasks) {
-      if (t.pos && t.id !== dragging.value) next[t.id] = t.pos;
-    }
-    for (const id of Object.keys(next)) {
-      if (!tasks.some((t) => t.id === id)) delete next[id];
-    }
-    positions.value = next;
+    const stored: Positions = {};
+    for (const t of tasks) if (t.pos) stored[t.id] = t.pos;
+    const live: Record<string, true> = {};
+    for (const t of tasks) live[t.id] = true;
+    positions.modify((p) => {
+      'worklet';
+      const map = p as Positions;
+      for (const id in stored) {
+        if (id !== dragging.value) map[id] = stored[id];
+      }
+      for (const id in map) {
+        if (!live[id]) delete map[id];
+      }
+      return p;
+    });
   }, [tasks, positions, dragging]);
 
   const startTx = useSharedValue(0);
   const startTy = useSharedValue(0);
   const startScale = useSharedValue(1);
+  const startFocalX = useSharedValue(0);
+  const startFocalY = useSharedValue(0);
 
   const clearSelection = () => onSelect(null);
 
@@ -99,17 +113,19 @@ export function MapCanvas({ tasks, theme, haptics, reduceMotion, selectedId, onS
     });
 
   const pinch = Gesture.Pinch()
-    .onStart(() => {
+    .onStart((e) => {
       startScale.value = scale.value;
       startTx.value = tx.value;
       startTy.value = ty.value;
+      startFocalX.value = e.focalX;
+      startFocalY.value = e.focalY;
     })
     .onUpdate((e) => {
       const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale.value * e.scale));
       const ratio = next / startScale.value;
-      // Zoom about the fingers, not the origin.
-      tx.value = e.focalX - (e.focalX - startTx.value) * ratio;
-      ty.value = e.focalY - (e.focalY - startTy.value) * ratio;
+      // Zoom about the fingers, not the origin, and follow them if they drift.
+      tx.value = startFocalX.value - (startFocalX.value - startTx.value) * ratio + (e.focalX - startFocalX.value);
+      ty.value = startFocalY.value - (startFocalY.value - startTy.value) * ratio + (e.focalY - startFocalY.value);
       scale.value = next;
     });
 
@@ -149,7 +165,11 @@ export function MapCanvas({ tasks, theme, haptics, reduceMotion, selectedId, onS
 
   return (
     <GestureDetector gesture={canvasGesture}>
-      <View style={styles.viewport} collapsable={false}>
+      <View
+        style={styles.viewport}
+        collapsable={false}
+        onLayout={(e) => onViewportLayout?.({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      >
         <Animated.View style={[styles.world, worldStyle]}>
           {edges.map((e) => (
             <Edge key={`${e.from}->${e.to}`} from={e.from} to={e.to} color={e.color} positions={positions} dims={dims} theme={theme} />
@@ -289,7 +309,11 @@ const MapCard = memo(function MapCard({
   const pickUp = () => {
     if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
-  const putDown = (p: Point) => handlers.current.onMove(id, p);
+  const putDown = (p: Point) => {
+    handlers.current.onMove(id, p);
+    // Only let the store take over once it has the new position.
+    dragging.value = null;
+  };
   const tap = () => {
     if (haptics) Haptics.selectionAsync();
     handlers.current.onSelect(id);
@@ -302,7 +326,7 @@ const MapCard = memo(function MapCard({
 
   const gesture = useMemo(() => {
     const drag = Gesture.Pan()
-      .activateAfterLongPress(160)
+      .activateAfterLongPress(220)
       .onStart(() => {
         if (committed.value) return;
         dragging.value = id;
@@ -313,16 +337,26 @@ const MapCard = memo(function MapCard({
       .onUpdate((e) => {
         if (committed.value) return;
         const s = scale.value;
-        positions.value = {
-          ...positions.value,
-          [id]: { x: startPos.value.x + e.translationX / s, y: startPos.value.y + e.translationY / s },
-        };
+        const next = { x: startPos.value.x + e.translationX / s, y: startPos.value.y + e.translationY / s };
+        positions.modify((p) => {
+          'worklet';
+          (p as Positions)[id] = next;
+          return p;
+        });
       })
-      .onFinalize(() => {
-        lift.value = withSpring(0, IOS_SPRING_SNAPPY);
+      // onEnd only runs after a real drag; onFinalize also runs for every
+      // tap that began as a hold, so it must not persist anything.
+      .onEnd(() => {
         const p = positions.value[id];
-        dragging.value = null;
-        if (p) runOnJS(putDown)(p);
+        if (p && (p.x !== startPos.value.x || p.y !== startPos.value.y)) {
+          runOnJS(putDown)(p);
+        } else {
+          dragging.value = null;
+        }
+      })
+      .onFinalize((_e, success) => {
+        lift.value = withSpring(0, IOS_SPRING_SNAPPY);
+        if (!success) dragging.value = null;
       });
 
     const doubleTap = Gesture.Tap()
@@ -388,7 +422,11 @@ const MapCard = memo(function MapCard({
       <Animated.View
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
-          dims.value = { ...dims.value, [id]: { w: width, h: height } };
+          dims.modify((d) => {
+            'worklet';
+            (d as Dims)[id] = { w: width, h: height };
+            return d;
+          });
         }}
         style={[
           styles.card,
