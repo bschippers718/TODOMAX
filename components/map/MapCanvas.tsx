@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -113,7 +113,18 @@ export function MapCanvas({ tasks, theme, haptics, reduceMotion, selectedId, onS
       scale.value = next;
     });
 
-  const backgroundTap = Gesture.Tap().onEnd(() => {
+  // Only empty board clears the selection. A tap that lands on a card belongs to the card.
+  const backgroundTap = Gesture.Tap().onEnd((e) => {
+    const s = scale.value;
+    const wx = (e.x - tx.value) / s;
+    const wy = (e.y - ty.value) / s;
+    const pos = positions.value;
+    const dm = dims.value;
+    for (const id in pos) {
+      const p = pos[id];
+      const d = dm[id] ?? { w: CARD_WIDTH.m, h: 60 };
+      if (wx >= p.x && wx <= p.x + d.w && wy >= p.y && wy <= p.y + d.h) return;
+    }
     runOnJS(clearSelection)();
   });
 
@@ -270,19 +281,24 @@ const MapCard = memo(function MapCard({
   const startPos = useSharedValue<Point>({ x: 0, y: 0 });
   const id = task.id;
 
+  // The gesture is built once, but the screen's handlers change with its
+  // state (which stop is selected). Always call the latest ones.
+  const handlers = useRef({ onSelect, onMove, onStrike, onComplete });
+  handlers.current = { onSelect, onMove, onStrike, onComplete };
+
   const pickUp = () => {
     if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
-  const putDown = (p: Point) => onMove(id, p);
+  const putDown = (p: Point) => handlers.current.onMove(id, p);
   const tap = () => {
     if (haptics) Haptics.selectionAsync();
-    onSelect(id);
+    handlers.current.onSelect(id);
   };
   const strikeNow = () => {
     if (haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onStrike(id);
+    handlers.current.onStrike(id);
   };
-  const complete = () => onComplete(id, size);
+  const complete = () => handlers.current.onComplete(id, size);
 
   const gesture = useMemo(() => {
     const drag = Gesture.Pan()

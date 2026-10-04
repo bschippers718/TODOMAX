@@ -1,4 +1,4 @@
-import { Alert, Image, View, Text, StyleSheet, Switch, ScrollView, Platform } from 'react-native';
+import { Alert, Image, View, Text, StyleSheet, Switch, ScrollView, Platform, Linking } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import * as Haptics from 'expo-haptics';
@@ -380,35 +380,45 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
-        {__DEV__ && (
-          <View style={styles.section}>
-            <Text style={sectionTitle}>Developer</Text>
-            <View style={card}>
-              <PressableScale style={styles.linkRow} onPress={loadSample} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
-                <View style={styles.linkTextWrap}>
-                  <Text style={[styles.linkTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
-                    Load sample stops
-                  </Text>
-                  <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                    12 open across every size and line, with links and Map positions, plus 3 struck today.
-                  </Text>
-                </View>
-                <Symbol name="tray.and.arrow.down" size={16} color={theme.textTertiary} weight="semibold" />
-              </PressableScale>
-              <View style={[styles.divider, { backgroundColor: theme.separator }]} />
-              <PressableScale style={styles.linkRow} onPress={clearAll} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
-                <View style={styles.linkTextWrap}>
-                  <Text style={[styles.linkTitle, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
-                    Clear all stops
-                  </Text>
-                </View>
-              </PressableScale>
-            </View>
+        <View style={styles.section}>
+          <Text style={sectionTitle}>Try it out</Text>
+          <View style={card}>
+            <PressableScale style={styles.linkRow} onPress={loadSample} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
+              <View style={styles.linkTextWrap}>
+                <Text style={[styles.linkTitle, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
+                  Load sample stops
+                </Text>
+                <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                  12 open across every size and line, with links and Map positions, plus 3 struck today.
+                </Text>
+              </View>
+              <Symbol name="tray.and.arrow.down" size={16} color={theme.textTertiary} weight="semibold" />
+            </PressableScale>
+            <View style={[styles.divider, { backgroundColor: theme.separator }]} />
+            <PressableScale style={styles.linkRow} onPress={clearAll} pressedScale={0.985} pressStyle="scale" accessibilityRole="button">
+              <View style={styles.linkTextWrap}>
+                <Text style={[styles.linkTitle, { color: theme.accent }]} maxFontSizeMultiplier={1.3}>
+                  Clear all stops
+                </Text>
+              </View>
+            </PressableScale>
           </View>
-        )}
+        </View>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v1.0</Text>
+          <PressableScale
+            onPress={() => Linking.openURL('https://x.com/bschippers')}
+            pressStyle="scale"
+            pressedScale={0.97}
+            hitSlop={8}
+            accessibilityRole="link"
+            accessibilityLabel="Built with love by @bschippers, opens X"
+          >
+            <Text style={[styles.footerText, { color: theme.textTertiary }]}>
+              Built with love by <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>@bschippers</Text>
+            </Text>
+          </PressableScale>
         </View>
       </ScrollView>
     </>
@@ -557,6 +567,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingVertical: 24,
+    gap: 6,
   },
   footerText: {
     fontSize: 13,
