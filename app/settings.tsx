@@ -407,18 +407,26 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: theme.textTertiary }]}>ToDOMax v1.0</Text>
-          <PressableScale
-            onPress={() => Linking.openURL('https://x.com/bschippers')}
-            pressStyle="scale"
-            pressedScale={0.97}
-            hitSlop={8}
-            accessibilityRole="link"
-            accessibilityLabel="Built with love by @bschippers, opens X"
-          >
-            <Text style={[styles.footerText, { color: theme.textTertiary }]}>
-              Built with love by <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>@bschippers</Text>
+          <Text style={[styles.footerText, { color: theme.textTertiary }]} accessible={false}>
+            Built with love by{' '}
+            <Text
+              style={[styles.footerName, { color: theme.textSecondary }]}
+              onPress={() => Linking.openURL('https://x.com/bschippers')}
+              accessibilityRole="link"
+              accessibilityLabel="@bschippers, opens X"
+            >
+              @bschippers
             </Text>
-          </PressableScale>
+            {' & '}
+            <Text
+              style={[styles.footerName, { color: theme.textSecondary }]}
+              onPress={() => Linking.openURL('https://www.youtube.com/@maxjosephdirector')}
+              accessibilityRole="link"
+              accessibilityLabel="@maxjoseph, opens YouTube"
+            >
+              @maxjoseph
+            </Text>
+          </Text>
         </View>
       </ScrollView>
     </>
@@ -571,5 +579,8 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
+  },
+  footerName: {
+    fontWeight: '600',
   },
 });
