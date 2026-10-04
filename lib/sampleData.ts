@@ -1,9 +1,9 @@
 import { Task, LineId, TaskSize } from './types';
 
 /**
- * A realistic day, for look-and-feel: twelve open stops across every size and
- * line, a few links, hand-laid Map positions, and three already struck today
- * so the Daily Route has colour. Loaded from Settings → Developer.
+ * A realistic full day, for look-and-feel: twenty open stops across every size
+ * and line, a handful of links, hand-laid Map positions, and four already
+ * struck today so the Daily Route has colour. Loaded from Settings → Try it out.
  */
 type Seed = {
   text: string;
@@ -30,7 +30,16 @@ const SEEDS: Seed[] = [
   { text: 'Fix the squeaky hinge', size: 's', pos: { x: 240, y: 440 } },
   { text: "Plan Dad's birthday dinner", line: 'orange', pos: { x: 410, y: 420 } },
   { text: 'Write the Signal style guide intro', size: 'l', line: 'red', pos: { x: 200, y: 560 }, after: [5, 6] },
+  { text: 'Email the accountant about the K-1', line: 'grey', pos: { x: 20, y: 700 }, ageH: 26 },
+  { text: 'Rough cut of the trailer by Sunday', size: 'l', line: 'purple', pos: { x: 250, y: 700 } },
+  { text: 'Order new running shoes', size: 's', line: 'green', pos: { x: 510, y: 690 } },
+  { text: 'Prep questions for the Tuesday interview', line: 'blue', pos: { x: 30, y: 840 }, after: [0] },
+  { text: 'Cancel the unused streaming sub', size: 's', line: 'grey', pos: { x: 270, y: 850 } },
+  { text: 'Sketch the title card options', line: 'red', pos: { x: 440, y: 830 }, after: [11] },
+  { text: 'Groceries for the week', size: 's', line: 'orange', pos: { x: 20, y: 970 } },
+  { text: 'Call Mom back', size: 's', pos: { x: 210, y: 970 }, ageH: 40 },
   // Struck today
+  { text: 'Take out the recycling', size: 's', line: 'orange', pos: { x: 0, y: 0 }, doneMinAgo: 260 },
   { text: 'Buy coffee filters', size: 's', line: 'green', pos: { x: 0, y: 0 }, doneMinAgo: 190 },
   { text: 'Reply to the landlord', line: 'grey', pos: { x: 0, y: 0 }, doneMinAgo: 120 },
   { text: 'Submit expense report', size: 'l', line: 'blue', pos: { x: 0, y: 0 }, doneMinAgo: 35 },

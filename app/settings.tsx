@@ -58,7 +58,7 @@ export default function SettingsScreen() {
   const { stats } = useCollection(unlockedAnimations);
   const { tasks, replaceTasks } = useTasks();
 
-  // Developer: a realistic day's worth of stops for look-and-feel.
+  // A realistic day's worth of stops for look-and-feel.
   const loadSample = () => {
     const go = () => {
       if (settings.hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -66,7 +66,7 @@ export default function SettingsScreen() {
       router.back();
     };
     if (tasks.length === 0) return go();
-    Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 12 open and 3 struck.`, [
+    Alert.alert('Load sample stops?', `This replaces your ${tasks.length} current stop${tasks.length === 1 ? '' : 's'} with 20 open and 4 struck.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Replace', style: 'destructive', onPress: go },
     ]);
@@ -389,7 +389,7 @@ export default function SettingsScreen() {
                   Load sample stops
                 </Text>
                 <Text style={[styles.linkSub, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                  12 open across every size and line, with links and Map positions, plus 3 struck today.
+                  20 open across every size and line, with links and Map positions, plus 4 struck today.
                 </Text>
               </View>
               <Symbol name="tray.and.arrow.down" size={16} color={theme.textTertiary} weight="semibold" />
