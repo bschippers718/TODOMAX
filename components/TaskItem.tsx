@@ -430,14 +430,35 @@ function TaskItemInner({
   );
 
   const radius = { borderRadius: theme.radiusCard };
-  // Signal: the index bullet is the line marker. Express Blue on the first stop,
-  // ink on the rest, Go Green once the pen has landed.
-  const bulletColor = struck ? theme.green : line ? lineColor(line, theme) : index === 0 ? theme.blue : theme.text;
-  const bulletInk = struck ? '#fff' : line ? onLineColor(line, theme) : theme.isDark && index !== 0 ? theme.bg : '#fff';
+  // A line colours the whole card, not just its marker. Editing drops back to
+  // the plain surface so the tray's controls stay legible.
+  const painted = Boolean(line) && !editing;
+  const paint = painted ? lineColor(line!, theme) : null;
+  const onPaint = painted ? onLineColor(line!, theme) : null;
+  // The index bullet: on a painted card it's the inverse (ink bubble, coloured
+  // numeral). Otherwise, Express Blue on the first stop, ink on the rest.
+  // Go Green once the pen has landed.
+  const bulletColor = painted
+    ? onPaint!
+    : struck
+      ? theme.green
+      : index === 0
+        ? theme.blue
+        : theme.text;
+  const bulletInk = painted
+    ? struck
+      ? theme.green
+      : paint!
+    : struck
+      ? '#fff'
+      : theme.isDark && index !== 0
+        ? theme.bg
+        : '#fff';
+  const inkColor = painted ? onPaint! : theme.accent;
   const textStyle = [
     styles.taskText,
     size === 'l' ? (signal ? theme.fontDisplay : styles.taskTextBigClassic) : theme.fontTask,
-    { color: theme.text },
+    { color: painted ? onPaint! : theme.text },
     signal && styles.taskTextSignal,
     size === 's' && styles.taskTextSmall,
     size === 'l' && styles.taskTextBig,
@@ -460,7 +481,7 @@ function TaskItemInner({
             signal && theme.shadowCard,
             size === 's' ? styles.cardSmall : styles.cardRegular,
             {
-              backgroundColor: theme.surface,
+              backgroundColor: paint ?? theme.surface,
               borderWidth: theme.borderWidth,
               borderColor: editing ? theme.accent : theme.cardBorder,
             },
@@ -489,18 +510,18 @@ function TaskItemInner({
               size === 'l' && styles.cardInnerBig,
             ]}
           >
-            {signal ? (
+            {/* The bullet is a row sibling of the text, so it centres on the
+                text block whatever height the card ends up. */}
+            {signal && (
               <View style={[styles.bullet, size === 'l' && styles.bulletBig, { backgroundColor: bulletColor }]}>
                 <Text style={[styles.bulletText, size === 'l' && styles.bulletTextBig, { color: bulletInk }]} allowFontScaling={false}>
                   {index + 1}
                 </Text>
               </View>
-            ) : (
-              line && <View style={[styles.lineBar, { backgroundColor: lineColor(line, theme) }]} />
             )}
 
             {editing ? (
-              <View>
+              <View style={styles.body}>
                 <TextInput
                   ref={inputRef}
                   style={[textStyle, styles.taskInput]}
@@ -525,12 +546,16 @@ function TaskItemInner({
                 />
               </View>
             ) : (
-              <Animated.View style={textAnimStyle}>
+              <Animated.View style={[styles.body, textAnimStyle]}>
                 <Text style={textStyle} numberOfLines={size === 'l' ? 4 : 3} maxFontSizeMultiplier={1.3}>
                   {task.text}
                 </Text>
                 {upstream && upstream.length > 0 && !struck && (
-                  <Text style={[styles.upstream, { color: theme.textTertiary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                  <Text
+                    style={[styles.upstream, painted ? { color: onPaint!, opacity: 0.8 } : { color: theme.textTertiary }]}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.3}
+                  >
                     after {upstream[0]}
                     {upstream.length > 1 ? ` +${upstream.length - 1}` : ''}
                   </Text>
@@ -539,7 +564,7 @@ function TaskItemInner({
             )}
 
             {inking && (
-              <InkTrail points={inkPoints} count={inkCount} opacity={inkOpacity} color={theme.accent} square={signal} />
+              <InkTrail points={inkPoints} count={inkCount} opacity={inkOpacity} color={inkColor} square={signal} />
             )}
           </View>
         </Animated.View>
@@ -677,7 +702,8 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flex: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     overflow: 'hidden',
   },
   cardInnerClassic: {
@@ -686,18 +712,19 @@ const styles = StyleSheet.create({
   },
   // The stop bullet sits in the gutter.
   cardInnerSignal: {
-    paddingLeft: 54,
+    paddingLeft: 14,
     paddingRight: 16,
     paddingVertical: 14,
   },
+  // Text column; the bullet (if any) sits beside it.
+  body: {
+    flex: 1,
+  },
   bullet: {
-    position: 'absolute',
-    left: 14,
-    top: '50%',
-    marginTop: -13,
     width: 26,
     height: 26,
     borderRadius: 13,
+    marginRight: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -742,18 +769,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    marginTop: -16,
-    left: 12,
+    marginRight: 12,
+    marginLeft: -2,
   },
   bulletTextBig: {
     fontSize: 15,
-  },
-  lineBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 5,
   },
   upstream: {
     fontSize: 12,
