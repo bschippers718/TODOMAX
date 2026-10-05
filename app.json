@@ -17,7 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.todomax.app",
+      "bundleIdentifier": "com.brooklynrunning.todomax",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -29,7 +29,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.todomax.app"
+      "package": "com.brooklynrunning.todomax"
     },
     "web": {
       "favicon": "./assets/favicon.png"
