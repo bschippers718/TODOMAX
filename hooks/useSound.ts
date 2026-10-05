@@ -35,6 +35,7 @@ const ANIMATION_SOUNDS: Record<AnimationId, string> = {
   errandComplete: 'fanfare',
   routeDrawn: 'whoosh',
   stopwatchStop: 'pop',
+  hydrantBlast: 'whoosh',
   carDash: 'whoosh',
   cashRegister: 'pop',
 };

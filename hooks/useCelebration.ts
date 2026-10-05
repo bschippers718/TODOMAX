@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AnimationId, Settings } from '../lib/types';
+import { AnimationId, Settings, isAnimationEligible } from '../lib/types';
 import { useShuffleBag } from './useShuffleBag';
 
 interface CelebrationState {
@@ -21,7 +21,8 @@ export function useCelebration(settings: Settings, pool: AnimationId[]) {
   const triggerCelebration = useCallback(
     (streak: number): AnimationId | null => {
       if (settings.animationMode === 'quiet') return null;
-      const animationId = draw();
+      // `streak` is today's tally; some celebrations wait for a hot day.
+      const animationId = draw((id) => isAnimationEligible(id, streak));
       setCelebration({ active: true, animationId, streak });
       return animationId;
     },

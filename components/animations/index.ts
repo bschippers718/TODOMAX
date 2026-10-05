@@ -17,6 +17,7 @@ import { PixelPowerUp } from './PixelPowerUp';
 import { ErrandComplete, ERRAND_COMPLETE_DURATION } from './kit/ErrandComplete';
 import { RouteDrawn, ROUTE_DRAWN_DURATION } from './kit/RouteDrawn';
 import { StopwatchStop, STOPWATCH_STOP_DURATION } from './kit/StopwatchStop';
+import { HydrantBlast, HYDRANT_BLAST_DURATION } from './kit/HydrantBlast';
 import { CarDash, CAR_DASH_DURATION } from './kit/CarDash';
 import { CashRegister, CASH_REGISTER_DURATION } from './kit/CashRegister';
 
@@ -39,6 +40,7 @@ export const ANIMATION_DURATIONS: Record<AnimationId, number> = {
   errandComplete: ERRAND_COMPLETE_DURATION,
   routeDrawn: ROUTE_DRAWN_DURATION,
   stopwatchStop: STOPWATCH_STOP_DURATION,
+  hydrantBlast: HYDRANT_BLAST_DURATION,
   carDash: CAR_DASH_DURATION,
   cashRegister: CASH_REGISTER_DURATION,
 };
@@ -64,6 +66,7 @@ export const animationRegistry: Record<
   errandComplete: ErrandComplete,
   routeDrawn: RouteDrawn,
   stopwatchStop: StopwatchStop,
+  hydrantBlast: HydrantBlast,
   carDash: CarDash,
   cashRegister: CashRegister,
 };

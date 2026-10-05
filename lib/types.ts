@@ -96,6 +96,7 @@ export type AnimationId =
   | 'errandComplete'
   | 'routeDrawn'
   | 'stopwatchStop'
+  | 'hydrantBlast'
   // Garage pack
   | 'carDash'
   // Checkout pack
@@ -119,9 +120,23 @@ export const ALL_ANIMATION_IDS: AnimationId[] = [
   'errandComplete',
   'routeDrawn',
   'stopwatchStop',
+  'hydrantBlast',
   'carDash',
   'cashRegister',
 ];
+
+/**
+ * Some celebrations only make sense once the day is going well. A hydrant
+ * blast for your first strike of the morning is a bit much; for your third
+ * it's earned. Unlisted animations are always eligible.
+ */
+export const ANIMATION_MIN_STREAK: Partial<Record<AnimationId, number>> = {
+  hydrantBlast: 2,
+};
+
+export function isAnimationEligible(id: AnimationId, streak: number): boolean {
+  return streak >= (ANIMATION_MIN_STREAK[id] ?? 0);
+}
 
 export interface CelebrationAnimationProps {
   onComplete: () => void;

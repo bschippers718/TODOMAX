@@ -44,12 +44,12 @@ export function useShuffleBag(pool: AnimationId[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolKey]);
 
-  const draw = (): AnimationId => {
+  const draw = (eligible?: (id: AnimationId) => boolean): AnimationId => {
     if (!bag || bagKey !== poolKey) {
       bag = new ShuffleBag(pool);
       bagKey = poolKey;
     }
-    const result = bag.draw();
+    const result = bag.draw(eligible);
     saveJSON(KEYS.SHUFFLE_BAG, bag.getRemaining());
     return result;
   };

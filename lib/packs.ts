@@ -47,11 +47,12 @@ export const PACKS: AnimationPack[] = [
     signalAccent: '#EE352E', // Stop Red
     glyph: '⚑',
     featured: true,
-    animations: ['errandComplete', 'routeDrawn', 'stopwatchStop'],
+    animations: ['errandComplete', 'routeDrawn', 'stopwatchStop', 'hydrantBlast'],
     animationNames: {
       errandComplete: 'Errand Complete',
       routeDrawn: 'Route Cleared',
       stopwatchStop: 'Beat the Clock',
+      hydrantBlast: "You're On Fire",
     },
   },
   {
