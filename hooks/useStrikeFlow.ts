@@ -9,7 +9,7 @@ import { useReduceMotion } from './useReduceMotion';
 import { useToast } from '../components/ui/Toast';
 import { ANIMATION_DURATIONS } from '../components/animations';
 import { useTheme } from '../lib/theme';
-import { CELEBRATION_COOLDOWN_MS, isQuietHour, Settings, TaskSize } from '../lib/types';
+import { CELEBRATION_COOLDOWN_MS, MASSIVE_HOLD_MS, isQuietHour, Settings, TaskSize, tierForSize } from '../lib/types';
 import { ANIMATION_META, getAnimationName } from '../lib/collection';
 import { getPackForAnimation, packAccent, PackId } from '../lib/packs';
 import { completeTask, useTasks } from './useTasks';
@@ -88,24 +88,27 @@ export function useStrikeFlow() {
 
   // The card is gone: commit and roll the celebration.
   const onComplete = useCallback(
-    (id: string, size: TaskSize = 'm') => {
-      completeTask(id);
+    (id: string, size: TaskSize = 'm', ink?: number[]) => {
+      const task = tasks.find((t) => t.id === id);
+      completeTask(id, ink);
 
       const now = Date.now();
-      // Size decides the weight of the moment. A big stop always gets the
-      // movie (quiet hours still win); a small one is always a glimpse.
+      // Size decides the weight of the moment (see CelebrationTier). A small
+      // stop is always a glimpse; Big and Massive always get the whole scene,
+      // even in rapid fire. Quiet hours win over everything.
+      const tier = tierForSize(size);
       const inCooldown = now < cooldownUntil;
-      const quiet = isQuietHour(settings) || size === 's' || (inCooldown && size !== 'l');
+      const quiet = isQuietHour(settings) || tier === 'glimpse' || (inCooldown && tier === 'scene');
       setDamped(quiet);
 
       // Today's tally including this one; Streak Combo shows it as the combo count.
       const dayStart = new Date(now).setHours(0, 0, 0, 0);
       const struckToday = tasks.filter((t) => t.completed && (t.completedAt ?? 0) >= dayStart && t.id !== id).length + 1;
-      const animId = triggerCelebration(struckToday);
+      const animId = triggerCelebration(struckToday, quiet ? (tier === 'glimpse' ? 'glimpse' : 'scene') : tier, task?.text);
       if (!animId) return;
       playCelebration(animId);
 
-      const fullMs = ANIMATION_DURATIONS[animId];
+      const fullMs = ANIMATION_DURATIONS[animId] + (tier === 'massive' && !quiet ? MASSIVE_HOLD_MS : 0);
       const visualMs = quiet || settings.animationMode === 'minimal' ? Math.min(fullMs, MINIMAL_VISUAL_MS) : fullMs;
       cooldownUntil = now + visualMs + CELEBRATION_COOLDOWN_MS;
 

@@ -78,14 +78,14 @@ export function addTask(text: string, difficulty: 'normal' | 'hard' = 'normal') 
   return task;
 }
 
-export function completeTask(id: string) {
+export function completeTask(id: string, ink?: number[]) {
   const now = Date.now();
-  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true, completedAt: now } : t)));
+  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true, completedAt: now, ink: ink?.length ? ink : undefined } : t)));
   setStreak((s) => advanceStreak(s, now));
 }
 
 export function uncompleteTask(id: string) {
-  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: false, completedAt: undefined } : t)));
+  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: false, completedAt: undefined, ink: undefined } : t)));
 }
 
 export function deleteTask(id: string) {
@@ -118,6 +118,39 @@ export function setTaskSize(id: string, size: TaskSize) {
 
 export function setTaskLine(id: string, line: LineId | undefined) {
   setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, line } : t)));
+}
+
+/**
+ * Move an open stop to position `to` among the open stops. The array is the
+ * order, so this is the whole persistence story; struck stops keep their slots.
+ */
+export function reorderTask(id: string, to: number) {
+  setTasks((prev) => {
+    const open = prev.filter((t) => !t.completed);
+    const from = open.findIndex((t) => t.id === id);
+    if (from < 0) return prev;
+    const target = Math.max(0, Math.min(to, open.length - 1));
+    if (from === target) return prev;
+    const next = [...open];
+    const [moved] = next.splice(from, 1);
+    next.splice(target, 0, moved);
+    let k = 0;
+    return prev.map((t) => (t.completed ? t : next[k++]));
+  });
+}
+
+/** `id` now comes after `upstreamId` (list drag: tucked under the stop above). */
+export function linkAfter(id: string, upstreamId: string): 'linked' | 'refused' | 'kept' {
+  const t = state.tasks.find((x) => x.id === id);
+  if (!t) return 'refused';
+  if (t.after?.includes(upstreamId)) return 'kept';
+  const r = toggleLink(upstreamId, id);
+  return r === 'linked' ? 'linked' : 'refused';
+}
+
+/** Pull a stop out from under everything it waited on. */
+export function clearAfter(id: string) {
+  setTasks((prev) => prev.map((t) => (t.id === id && t.after?.length ? { ...t, after: undefined } : t)));
 }
 
 export function moveTask(id: string, pos: { x: number; y: number }) {
@@ -220,6 +253,9 @@ export function useTasks() {
       editTask,
       setTaskSize,
       setTaskLine,
+      reorderTask,
+      linkAfter,
+      clearAfter,
       moveTask,
       placeTasks,
       toggleLink,

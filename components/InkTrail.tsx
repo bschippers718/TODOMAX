@@ -151,6 +151,73 @@ export function pushInkPoint(points: SharedValue<number[]>, count: SharedValue<n
   });
 }
 
+/**
+ * A mark that already happened. Same geometry as the live trail, drawn once
+ * from a stored, card-normalised [x, y, w, ...] array (see `Task.ink`).
+ */
+export const StaticInk = memo(function StaticInk({
+  ink,
+  width,
+  height,
+  color,
+  square,
+  opacity = 1,
+}: {
+  ink: number[];
+  width: number;
+  height: number;
+  color: string;
+  square: boolean;
+  opacity?: number;
+}) {
+  const segs = useMemo(() => {
+    const n = Math.floor(ink.length / 3);
+    const out: ViewStyle[] = [];
+    for (let i = 0; i + 1 < n; i++) {
+      const a = i * 3;
+      const b = a + 3;
+      const x0 = ink[a] * width;
+      const y0 = ink[a + 1] * height;
+      const x1 = ink[b] * width;
+      const y1 = ink[b + 1] * height;
+      const w = (ink[a + 2] + ink[b + 2]) / 2;
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const total = len + (square ? w * 0.6 : w);
+      out.push({
+        transform: [
+          { translateX: (x0 + x1) / 2 - SEG_W / 2 },
+          { translateY: (y0 + y1) / 2 - SEG_H / 2 },
+          { rotate: `${Math.atan2(dy, dx)}rad` },
+          { scaleX: total / SEG_W },
+          { scaleY: w / SEG_H },
+        ],
+      });
+    }
+    return out;
+  }, [ink, width, height, square]);
+  if (width <= 0 || height <= 0) return null;
+  return (
+    <Animated.View style={[styles.layer, { opacity }]} pointerEvents="none">
+      {segs.map((s, i) => (
+        <Animated.View key={i} style={[styles.seg, square && styles.segSquare, { backgroundColor: color }, s]} />
+      ))}
+    </Animated.View>
+  );
+});
+
+/** A plain hand-ish line across a card, for struck stops that have no saved mark. */
+export function straightInk(penWidth: number, fromX = 0.12, toX = 0.94): number[] {
+  const steps = 24;
+  const out: number[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    out.push(fromX + (toX - fromX) * t, 0.5 + Math.sin(t * Math.PI * 2.3) * 0.04 + t * 0.05, penWidth);
+  }
+  return out;
+}
+
 const styles = StyleSheet.create({
   layer: {
     ...StyleSheet.absoluteFillObject,
