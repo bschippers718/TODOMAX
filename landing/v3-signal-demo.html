@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ToDOMax — Cross one thing off. Try it.</title>
+<meta name="description" content="ToDOMax is a to-do list for iOS. Drag your finger across an item to cross it off and a three-second pixel scene plays. Free, two packs included.">
+<meta name="theme-color" content="#F6F3EC">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@900&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F3EC; --enamel:#FFFFFF; --ink:#0B0B0C;
+    --yellow:#FCCC0A;
+    --red:#EE352E; --green:#00933C; --blue:#0039A6; --orange:#FF6319; --purple:#B933AD; --grey:#808183;
+    --banner-red:#E3221B; --banner-yellow:#E8D21C;
+    --bw:2.5px;
+    --r:6px;
+    --shadow4:4px 4px 0 var(--ink);
+    --shadow6:6px 6px 0 var(--ink);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif; font-weight:400;
+    font-size:17px; line-height:1.5; touch-action:pan-y;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  img{display:block}
+  h1,h2,h3{margin:0; font-family:'Archivo',sans-serif; font-weight:900; letter-spacing:-.035em; line-height:1}
+  p{margin:0}
+  .wrap{max-width:1000px; margin:0 auto; padding:0 20px}
+  .ps{font-family:'Press Start 2P',monospace; font-size:9px; letter-spacing:.02em; text-transform:uppercase; line-height:1.4}
+  .ps-10{font-size:10px}
+  .muted{color:var(--grey)}
+  .bullet{
+    display:inline-flex; align-items:center; justify-content:center; flex:none;
+    width:26px; height:26px; border-radius:50%; background:var(--ink); color:#fff;
+    font-family:'Archivo',sans-serif; font-weight:900; font-size:14px; letter-spacing:0; line-height:1;
+  }
+
+  /* nav */
+  .nav{display:flex; align-items:center; justify-content:space-between; padding-top:22px; padding-bottom:10px}
+  .brand{display:flex; align-items:center; gap:10px; text-decoration:none; font-family:'Archivo',sans-serif; font-weight:900; font-size:18px; letter-spacing:-.035em}
+  .brand img{width:34px; height:34px; border-radius:22%; border:var(--bw) solid var(--ink)}
+
+  /* hero */
+  .hero{display:grid; grid-template-columns:1fr; gap:36px; padding-top:36px; padding-bottom:60px; align-items:start}
+  .eyebrow{margin-bottom:20px}
+  .hero h1{font-size:clamp(46px,8.4vw,84px); max-width:9ch}
+  .hero h1 .u{position:relative; display:inline-block}
+  .hero h1 .u::after{content:""; position:absolute; left:-1%; right:-1%; top:62%; height:.11em; background:var(--yellow); transform:rotate(-1.2deg)}
+  .lede{margin-top:20px; font-size:clamp(18px,2.3vw,22px); font-weight:500; color:var(--grey)}
+  .badge-row{display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-top:28px}
+  .badge-row img{height:48px; width:auto}
+  .badge-row p{font-size:15px; color:var(--grey); font-weight:500}
+  .hero-accent{margin-top:34px; width:132px; image-rendering:pixelated}
+
+  /* demo card */
+  .card{
+    position:relative; background:var(--enamel); border:var(--bw) solid var(--ink);
+    border-radius:var(--r); box-shadow:var(--shadow6); overflow:hidden;
+  }
+  .card-head{display:flex; flex-direction:column; gap:10px; padding:18px 18px 14px; border-bottom:var(--bw) solid var(--ink)}
+  .card-head .top{display:flex; justify-content:space-between; align-items:center}
+  .card-head h2{font-size:clamp(26px,4vw,34px)}
+  .rows{padding:16px 18px 6px; display:flex; flex-direction:column; gap:14px}
+  .row{
+    position:relative; display:flex; align-items:center; gap:12px;
+    padding:14px 14px 14px 12px; background:var(--enamel);
+    border:var(--bw) solid var(--ink); border-radius:var(--r); box-shadow:var(--shadow4);
+    cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    touch-action:none; outline:none;
+    transition:transform .12s, box-shadow .12s, background .25s;
+  }
+  .row:hover{transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink)}
+  .row:active{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink)}
+  .row:focus-visible{box-shadow:var(--shadow4), 0 0 0 3px var(--paper), 0 0 0 5.5px var(--blue)}
+  .row .label{flex:1; font-size:16px; font-weight:600; line-height:1.35; transition:color .25s}
+  .row .meta{display:flex; align-items:center; gap:8px; flex:none}
+  .row .size{font-size:9px; color:var(--grey)}
+  .row:first-child .bullet{background:var(--blue)}
+  .row.struck .bullet{background:var(--green); color:#fff}
+  .row.struck .label{color:var(--grey); font-weight:500}
+  .row.struck{cursor:default}
+  .row.struck:hover,.row.struck:active{transform:none; box-shadow:var(--shadow4)}
+  /* second stop carries a line: a fully colored card */
+  .row.line-red{background:var(--red); color:#fff}
+  .row.line-red .bullet{background:#fff; color:var(--red)}
+  .row.line-red .size{color:rgba(255,255,255,.8)}
+  .row.line-red.struck .label{color:rgba(255,255,255,.6)}
+  .row.line-red.struck .bullet{background:var(--green); color:#fff}
+
+  .ink{
+    position:absolute; top:50%; left:0; height:10px; width:0; margin-top:-5px;
+    pointer-events:none; filter:url(#wobble); will-change:width;
+  }
+  .ink::before,.ink::after,.ink i{content:""; position:absolute; inset:0; background:var(--yellow); display:block}
+  .ink::before{transform:translate(2px,-2px) rotate(-.35deg); opacity:.7}
+  .ink::after{transform:translate(-1px,2px) rotate(.45deg); opacity:.7}
+  .ink.settle{transition:width .22s cubic-bezier(.2,.8,.2,1)}
+  .ink.snap{transition:width .18s ease}
+
+  .route{display:none; align-items:center; gap:12px; margin:14px 18px 0; padding:12px 14px; border:var(--bw) solid var(--ink); border-radius:var(--r); background:var(--paper)}
+  .route.show{display:flex}
+  .route .sq{display:flex; gap:6px}
+  .route .sq b{width:18px; height:18px; border:var(--bw) solid var(--ink); border-radius:2px; background:var(--yellow); display:block}
+  .route img{width:20px; image-rendering:pixelated; margin-left:auto}
+  .card-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px 18px}
+  .reset{appearance:none; background:none; border:0; font:inherit; font-size:14px; font-weight:600; color:var(--ink); text-decoration:underline; text-underline-offset:3px; cursor:pointer; padding:4px 2px}
+  .reset:hover{color:var(--blue)}
+  .reset:focus-visible{outline:2.5px solid var(--blue); outline-offset:3px}
+
+  /* stage: celebrations inside the card */
+  .stage{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:3}
+  .px{position:absolute; width:10px; height:10px; border:2px solid var(--ink); will-change:transform,opacity}
+  .water{position:absolute; will-change:transform,opacity}
+  .banner{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:var(--banner-red); color:var(--banner-yellow); white-space:nowrap;
+    font-family:'Press Start 2P',monospace; font-size:clamp(12px,2.6vw,18px); line-height:1;
+    padding:16px 22px 14px; border:var(--bw) solid var(--ink); box-shadow:var(--shadow4);
+    animation:bannerIn 1.5s cubic-bezier(.2,.9,.25,1) both;
+  }
+  @keyframes bannerIn{
+    0%{transform:translate(-180%,-50%)} 14%{transform:translate(-50%,-50%)}
+    84%{transform:translate(-50%,-50%); opacity:1} 100%{transform:translate(80%,-50%); opacity:0}
+  }
+
+  /* sections */
+  section{padding:52px 0}
+  section.wrap:not(.hero):not(.cta){padding-top:52px; padding-bottom:52px}
+  .sec-h{font-size:clamp(32px,4.8vw,48px); margin-bottom:26px}
+  .cards{display:grid; grid-template-columns:1fr; gap:18px}
+  .why{background:var(--enamel); border:var(--bw) solid var(--ink); border-radius:var(--r); box-shadow:var(--shadow4); padding:22px 22px 24px}
+  .why .top{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px}
+  .why h3{font-size:22px; margin-bottom:8px}
+  .why p{color:var(--grey); font-weight:500; font-size:16px}
+
+  /* service board */
+  .board{background:var(--enamel); border:var(--bw) solid var(--ink); border-radius:var(--r); box-shadow:var(--shadow6); overflow:hidden}
+  .board .hd{display:flex; justify-content:space-between; padding:12px 18px; border-bottom:var(--bw) solid var(--ink); background:var(--ink); color:#fff}
+  .board ul{list-style:none; margin:0; padding:0}
+  .board li{display:flex; align-items:center; gap:14px; padding:14px 18px; border-bottom:var(--bw) solid var(--ink)}
+  .board li:last-child{border-bottom:0}
+  .board li .name{flex:1; font-weight:600}
+  .board li .desc{color:var(--grey); font-weight:500; font-size:15px; display:none}
+  .board .price{padding:6px 8px 5px; border:2px solid var(--ink); border-radius:3px; background:var(--paper)}
+  .board .price.free{background:var(--yellow)}
+  .packs-note{margin-top:18px; color:var(--grey); font-weight:500}
+
+  /* quiet */
+  .quiet{border-top:var(--bw) solid var(--ink); border-bottom:var(--bw) solid var(--ink); padding:40px 0}
+  .quiet ul{list-style:none; margin:20px 0 0; padding:0; display:grid; grid-template-columns:1fr; gap:14px 36px}
+  .quiet li{display:flex; align-items:flex-start; gap:12px; font-weight:500; color:var(--grey)}
+  .quiet li b{width:12px; height:12px; border:2px solid var(--ink); border-radius:2px; flex:none; margin-top:7px}
+
+  /* cta + footer */
+  .cta{text-align:center; padding-top:56px; padding-bottom:56px}
+  .cta .icon{width:88px; height:88px; border-radius:22%; margin:0 auto 20px; border:var(--bw) solid var(--ink); box-shadow:var(--shadow4)}
+  .cta h2{font-size:clamp(32px,4.8vw,48px); margin-bottom:10px}
+  .cta p{color:var(--grey); font-weight:500; margin-bottom:22px}
+  .cta a{display:inline-block}
+  .cta a img{height:48px; width:auto}
+  footer{border-top:var(--bw) solid var(--ink); padding:28px 0 44px}
+  .foot{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; color:var(--grey); font-weight:500; font-size:15px}
+  .foot nav{display:flex; gap:18px}
+  .foot nav a{text-decoration:none; color:var(--ink)}
+  .foot nav a:hover{text-decoration:underline; text-underline-offset:3px}
+  .foot .ps{color:var(--ink)}
+  .foot .badge img{height:40px; width:auto}
+
+  @media (min-width:720px){
+    .hero{grid-template-columns:1fr 1.05fr; gap:48px; padding-top:56px; padding-bottom:80px}
+    .cards{grid-template-columns:repeat(3,1fr)}
+    .quiet ul{grid-template-columns:1fr 1fr}
+    .board li .desc{display:block}
+  }
+  @media (min-width:960px){ .hero{gap:64px} }
+  @media (max-width:420px){
+    .card-foot{flex-wrap:wrap}
+    .rows{padding:14px 14px 4px}
+    .card-head{padding:16px 14px 12px}
+    .route{margin:14px 14px 0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .banner{animation:bannerFade 1.5s ease both}
+    @keyframes bannerFade{0%{opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{opacity:0}}
+    .ink.settle,.ink.snap,.row,.row .label{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="wobble" x="-4%" y="-120%" width="108%" height="340%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.5" numOctaves="2" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="3.4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<header class="wrap nav">
+  <a class="brand" href="#"><img src="assets/icon.png" alt="" width="34" height="34">ToDOMax</a>
+  <span class="ps muted">iOS</span>
+</header>
+
+<main>
+  <section class="wrap hero" id="top">
+    <div class="hero-copy">
+      <div class="ps eyebrow">ToDOMax · iOS</div>
+      <h1>Cross <span class="u">one thing</span> off.</h1>
+      <p class="lede">It's a to-do list. Drag your finger across one of these.</p>
+      <div class="badge-row">
+        <a href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+        <p>Free on iOS. The real one works the same way, full screen, on your phone.</p>
+      </div>
+      <img class="hero-accent" src="assets/building.png" alt="" width="132" height="77">
+    </div>
+
+    <div class="demo">
+      <div class="card" id="card">
+        <div class="card-head">
+          <div class="top">
+            <span class="ps" id="dateTag">Monday · Oct 5</span>
+            <span class="ps muted">Route</span>
+          </div>
+          <h2 id="title">3 stops to go</h2>
+        </div>
+
+        <div class="rows" id="rows">
+          <div class="row" role="button" tabindex="0" aria-pressed="false" aria-label="Strike: Water the fig" data-text="Water the fig">
+            <span class="bullet">1</span>
+            <span class="label">Water the fig</span>
+            <span class="meta"><span class="ps size">S</span></span>
+            <div class="ink"><i></i></div>
+          </div>
+          <div class="row line-red" role="button" tabindex="0" aria-pressed="false" aria-label="Strike: Call the dentist about the crown" data-text="Call the dentist about the crown">
+            <span class="bullet">2</span>
+            <span class="label">Call the dentist about the crown</span>
+            <span class="meta"><span class="ps size">M</span></span>
+            <div class="ink"><i></i></div>
+          </div>
+          <div class="row" role="button" tabindex="0" aria-pressed="false" aria-label="Strike: Return library books" data-text="Return library books">
+            <span class="bullet">3</span>
+            <span class="label">Return library books</span>
+            <span class="meta"><span class="ps size">B</span></span>
+            <div class="ink"><i></i></div>
+          </div>
+        </div>
+
+        <div class="route" id="route" aria-hidden="true">
+          <span class="ps">Daily route</span>
+          <span class="sq"><b></b><b></b><b></b></span>
+          <img src="assets/flag.png" alt="" width="20" height="23">
+        </div>
+
+        <div class="card-foot">
+          <span class="ps ps-10" aria-live="polite">Struck today · <span id="count">0</span></span>
+          <button class="reset" type="button" id="reset">Reset</button>
+        </div>
+
+        <div class="stage" id="stage" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="why">
+    <h2 class="sec-h">What it is</h2>
+    <div class="cards">
+      <article class="why">
+        <div class="top"><span class="bullet">1</span><span class="ps muted">The strike</span></div>
+        <h3>A line, not a checkbox</h3>
+        <p>Drag your finger across the item. The ink follows. That's how you finish something here, not a tap.</p>
+      </article>
+      <article class="why">
+        <div class="top"><span class="bullet">2</span><span class="ps muted">Celebrations</span></div>
+        <h3>Three seconds, then it's gone</h3>
+        <p>Every time you cross something off, a full-screen pixel scene plays. They shuffle, so you don't get the same one back to back.</p>
+      </article>
+      <article class="why">
+        <div class="top"><span class="bullet">3</span><span class="ps muted">Daily route</span></div>
+        <h3>Today is a route</h3>
+        <p>Items are stops. See them on a map, fill in the Daily Route strip, keep the streak going.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap" id="packs">
+    <h2 class="sec-h">The packs</h2>
+    <div class="board">
+      <div class="hd"><span class="ps">Packs</span><span class="ps">Service</span></div>
+      <ul>
+        <li><span class="bullet" style="background:var(--red)">E</span><span class="name">Errand Run</span><span class="desc">Landmarks, inked routes, a stopwatch, the hydrant.</span><span class="ps price free">Free</span></li>
+        <li><span class="bullet" style="background:var(--green)">S</span><span class="name">Starter</span><span class="desc">Stamps, confetti, arcade stuff.</span><span class="ps price free">Free</span></li>
+        <li><span class="bullet" style="background:var(--blue)">G</span><span class="name">Game Day</span><span class="desc">Touchdowns, a halftime band.</span><span class="ps price">$1.99</span></li>
+        <li><span class="bullet" style="background:var(--orange)">G</span><span class="name">Garage</span><span class="desc">Pixel cars, a checkered flag.</span><span class="ps price">$1.99</span></li>
+        <li><span class="bullet" style="background:var(--purple)">C</span><span class="name">Checkout</span><span class="desc">Receipts, a cash drawer.</span><span class="ps price">$1.99</span></li>
+      </ul>
+    </div>
+    <p class="packs-note">Two come with the app. The others are $1.99 each, one time. The Collection board keeps track of what you've seen.</p>
+  </section>
+
+  <section class="quiet" id="quiet">
+    <div class="wrap">
+      <h2 class="sec-h" style="margin-bottom:0">It's loud. You can turn it down.</h2>
+      <ul>
+        <li><b style="background:var(--blue)"></b>Quiet hours. Pick a time; after it, scenes go minimal.</li>
+        <li><b style="background:var(--green)"></b>Sound and haptics: low, full or off.</li>
+        <li><b style="background:var(--yellow)"></b>Reduce Motion is respected, scenes included.</li>
+        <li><b style="background:var(--grey)"></b>Use your own photo as the background.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="wrap cta">
+    <img class="icon" src="assets/icon.png" alt="ToDOMax app icon" width="88" height="88">
+    <h2>That's the app.</h2>
+    <p>Free on the App Store. Two packs included.</p>
+    <a href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="badge" href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+    <span>Made with love in Brooklyn.</span>
+    <nav><a href="#">Privacy</a><a href="#">Support</a></nav>
+    <span class="ps">todomax.app</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var card = document.getElementById('card');
+  var stage = document.getElementById('stage');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.row'));
+  var route = document.getElementById('route');
+  var countEl = document.getElementById('count');
+  var titleEl = document.getElementById('title');
+  var resetBtn = document.getElementById('reset');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var COLORS = ['#FCCC0A','#EE352E','#0039A6','#00933C','#FFFFFF'];
+  var LINES = ['ONE LESS THING','STOP CLEARED','DONE'];
+  var lastLine = -1;
+  var struck = 0;
+  var THRESHOLD = 0.6;
+
+  function pickLine(){
+    var i;
+    do { i = Math.floor(Math.random()*LINES.length); } while (i === lastLine);
+    lastLine = i;
+    return LINES[i];
+  }
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  function remove(node){ if (node && node.parentNode) node.parentNode.removeChild(node); }
+
+  /* ---- ink geometry (stroke runs from the label's left edge to the size tag) ---- */
+  function inkStart(row){ return row.querySelector('.label').offsetLeft - 6; }
+  function inkMax(row){
+    var meta = row.querySelector('.meta');
+    return (meta.offsetLeft + meta.offsetWidth + 6) - inkStart(row);
+  }
+  function placeInk(row){ row.querySelector('.ink').style.left = inkStart(row) + 'px'; }
+  rows.forEach(placeInk);
+  window.addEventListener('resize', function(){ rows.forEach(placeInk); });
+
+  /* ---- striking ---- */
+  rows.forEach(function(row){
+    var ink = row.querySelector('.ink');
+    var dragging = false, pid = null, startX = 0, moved = false;
+
+    function currentWidth(clientX){
+      var rect = row.getBoundingClientRect();
+      var x = clientX - rect.left - inkStart(row);
+      return Math.max(0, Math.min(inkMax(row), x));
+    }
+    function snapBack(){ ink.classList.add('snap'); ink.style.width = '0px'; }
+
+    row.addEventListener('pointerdown', function(e){
+      if (row.classList.contains('struck') || dragging) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      dragging = true; moved = false; pid = e.pointerId; startX = e.clientX;
+      ink.classList.remove('settle','snap');
+      row.setPointerCapture(pid);
+      ink.style.width = currentWidth(e.clientX) + 'px';
+    });
+
+    row.addEventListener('pointermove', function(e){
+      if (!dragging || e.pointerId !== pid) return;
+      if (Math.abs(e.clientX - startX) > 6) moved = true;
+      ink.style.width = currentWidth(e.clientX) + 'px';
+    });
+
+    function finish(e){
+      if (!dragging || e.pointerId !== pid) return;
+      dragging = false;
+      try { row.releasePointerCapture(pid); } catch(_){}
+      pid = null;
+      if (e.type === 'pointercancel'){ snapBack(); return; }
+      var w = currentWidth(e.clientX), max = inkMax(row);
+      if (!moved){ commit(row, ink, true); return; }          // plain tap or click
+      if (w >= max * THRESHOLD){ commit(row, ink, false); }   // dragged far enough
+      else { snapBack(); }
+    }
+    row.addEventListener('pointerup', finish);
+    row.addEventListener('pointercancel', finish);
+    row.addEventListener('lostpointercapture', function(){ if (dragging){ dragging = false; pid = null; snapBack(); } });
+
+    row.addEventListener('keydown', function(e){
+      if (row.classList.contains('struck')) return;
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); commit(row, ink, true); }
+    });
+  });
+
+  function setTitle(){
+    var left = rows.length - struck;
+    titleEl.textContent = left === 0 ? 'Route cleared' : left + (left === 1 ? ' stop to go' : ' stops to go');
+  }
+
+  function commit(row, ink, animateIn){
+    row.classList.add('struck');
+    row.setAttribute('aria-pressed','true');
+    row.setAttribute('aria-label', 'Struck: ' + row.getAttribute('data-text'));
+    ink.classList.add('settle');
+    if (animateIn && !reduce.matches){
+      ink.style.width = '0px';
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ ink.style.width = inkMax(row) + 'px'; }); });
+    } else {
+      ink.style.width = inkMax(row) + 'px';
+    }
+    struck++;
+    countEl.textContent = struck;
+    setTitle();
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch(_){} }
+
+    var rr = row.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    var ox = rr.left - cr.left + rr.width/2, oy = rr.top - cr.top + rr.height/2;
+
+    setTimeout(function(){
+      if (struck === 2){ hydrant(); }
+      else if (struck === 3){ routeCleared(ox, oy); }
+      else { basic(ox, oy); }
+    }, animateIn ? 180 : 40);
+  }
+
+  /* ---- celebrations ---- */
+  function clearStage(){ while (stage.firstChild) stage.removeChild(stage.firstChild); }
+
+  function banner(text, ms){
+    var b = document.createElement('div');
+    b.className = 'banner';
+    b.textContent = text;
+    b.style.animationDuration = (ms||1500) + 'ms';
+    stage.appendChild(b);
+    b.addEventListener('animationend', function(){ remove(b); });
+  }
+
+  function basic(x, y){
+    clearStage();
+    banner(pickLine(), 1500);
+    if (!reduce.matches) confetti(x, y, 24);
+  }
+
+  function routeCleared(x, y){
+    clearStage();
+    route.classList.add('show');
+    banner('ROUTE CLEARED', 1700);
+    if (!reduce.matches){
+      confetti(x, y, 24);
+      setTimeout(function(){ confetti(card.clientWidth*0.25, card.clientHeight*0.85, 12); }, 180);
+      setTimeout(function(){ confetti(card.clientWidth*0.75, card.clientHeight*0.85, 12); }, 320);
+    }
+  }
+
+  function confetti(x, y, n){
+    var g = 1500; // px/s^2
+    for (var i=0;i<n;i++){
+      var el = document.createElement('div');
+      el.className = 'px';
+      var s = Math.round(rand(8,14));
+      el.style.width = s+'px'; el.style.height = s+'px';
+      el.style.background = COLORS[i % COLORS.length];
+      el.style.left = (x - s/2) + 'px'; el.style.top = (y - s/2) + 'px';
+      stage.appendChild(el);
+      var vx = rand(-280, 280), vy = rand(-600, -320), rot = rand(-540, 540);
+      var dur = rand(0.9, 1.3), steps = 10, frames = [];
+      for (var k=0;k<=steps;k++){
+        var t = dur * k/steps;
+        frames.push({
+          transform: 'translate(' + (vx*t).toFixed(1) + 'px,' + (vy*t + 0.5*g*t*t).toFixed(1) + 'px) rotate(' + (rot*t).toFixed(0) + 'deg)',
+          opacity: k >= steps-2 ? (k === steps ? 0 : 0.7) : 1
+        });
+      }
+      var anim = el.animate(frames, { duration: dur*1000, easing: 'linear', fill: 'forwards' });
+      anim.onfinish = (function(node){ return function(){ remove(node); }; })(el);
+    }
+  }
+
+  function hydrant(){
+    clearStage();
+    banner("YOU'RE ON FIRE!", 1500);
+    if (reduce.matches) return;
+    var W = card.clientWidth, H = card.clientHeight;
+    // the wave: Express Blue blocks sweeping left to right
+    for (var i=0;i<34;i++){
+      var el = document.createElement('div');
+      el.className = 'water';
+      var s = Math.round(rand(14, 30));
+      el.style.width = s+'px'; el.style.height = s+'px';
+      el.style.background = Math.random() < 0.6 ? '#0039A6' : '#6FB7F0';
+      el.style.left = (-s - rand(0, 70)) + 'px';
+      el.style.top = rand(-4, H - s) + 'px';
+      stage.appendChild(el);
+      var dur = rand(800, 1150), delay = rand(0, 300), bob = rand(-20, 20);
+      var a = el.animate([
+        { transform: 'translate(0,0)', opacity: 1 },
+        { transform: 'translate(' + (W*0.55).toFixed(0) + 'px,' + bob + 'px)', opacity: 1, offset: 0.55 },
+        { transform: 'translate(' + (W + 130).toFixed(0) + 'px,' + (-bob) + 'px)', opacity: 0.9 }
+      ], { duration: dur, delay: delay, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'forwards' });
+      a.onfinish = (function(node){ return function(){ remove(node); }; })(el);
+    }
+    // a few white droplets arcing out of the spray
+    var g = 1600;
+    for (var j=0;j<8;j++){
+      var d = document.createElement('div');
+      d.className = 'px';
+      var ds = Math.round(rand(6, 10));
+      d.style.width = ds+'px'; d.style.height = ds+'px'; d.style.background = '#FFFFFF';
+      d.style.left = rand(10, W*0.3) + 'px'; d.style.top = rand(H*0.3, H*0.7) + 'px';
+      stage.appendChild(d);
+      var vx = rand(120, 440), vy = rand(-440, -200), ddur = rand(0.7, 1.0), fr = [];
+      for (var k=0;k<=8;k++){
+        var t = ddur*k/8;
+        fr.push({ transform: 'translate(' + (vx*t).toFixed(1) + 'px,' + (vy*t + 0.5*g*t*t).toFixed(1) + 'px)', opacity: k === 8 ? 0 : 1 });
+      }
+      var da = d.animate(fr, { duration: ddur*1000, delay: rand(100, 500), easing: 'linear', fill: 'forwards' });
+      da.onfinish = (function(node){ return function(){ remove(node); }; })(d);
+    }
+  }
+
+  /* ---- reset ---- */
+  resetBtn.addEventListener('click', function(){
+    clearStage();
+    struck = 0;
+    countEl.textContent = '0';
+    setTitle();
+    route.classList.remove('show');
+    rows.forEach(function(row){
+      row.classList.remove('struck');
+      row.setAttribute('aria-pressed','false');
+      row.setAttribute('aria-label', 'Strike: ' + row.getAttribute('data-text'));
+      var ink = row.querySelector('.ink');
+      ink.classList.remove('settle');
+      ink.classList.add('snap');
+      ink.style.width = '0px';
+    });
+    rows[0].focus({ preventScroll: true });
+  });
+
+  // live date in the card header
+  var d = new Date();
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('dateTag').textContent = days[d.getDay()] + ' · ' + months[d.getMonth()] + ' ' + d.getDate();
+})();
+</script>
+</body>
+</html>

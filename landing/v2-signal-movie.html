@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ToDOMax — The reward is three seconds long.</title>
+<meta name="description" content="ToDOMax is a to-do list for iOS. Cross something off and a three-second pixel scene plays. Free, two packs included, no subscription.">
+<meta name="theme-color" content="#F6F3EC">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@900&family=Inter:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F3EC; --enamel:#FFFFFF; --ink:#0B0B0C; --yellow:#FCCC0A;
+    --red:#EE352E; --green:#00933C; --blue:#0039A6; --orange:#FF6319; --purple:#B933AD; --grey:#808183;
+    --muted:#55565A; --rule:#D9D5CB;
+    --display:'Archivo',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --px:'Press Start 2P',monospace;
+    --border:2.5px solid var(--ink);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;overflow-x:hidden}
+  img{display:block;max-width:100%}
+  a{color:inherit}
+  h1,h2,h3,p{margin:0}
+  .wrap{width:min(1100px,calc(100% - 40px));margin:0 auto}
+  .display{font-family:var(--display);font-weight:900;letter-spacing:-.035em;line-height:1.02}
+  .eyebrow{font-family:var(--px);font-size:9px;line-height:1.8;letter-spacing:.02em;color:var(--ink);display:inline-flex;align-items:center;gap:10px}
+  .eyebrow::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);flex:none}
+  .pixel{image-rendering:pixelated;image-rendering:crisp-edges}
+  .card{background:var(--enamel);border:var(--border);border-radius:6px;box-shadow:5px 5px 0 var(--ink)}
+  .badge{display:inline-block;line-height:0;text-decoration:none}
+  .badge img{height:48px;width:auto}
+  .btn{display:inline-flex;align-items:center;gap:10px;padding:13px 20px;background:var(--yellow);color:var(--ink);border:var(--border);border-radius:6px;box-shadow:4px 4px 0 var(--ink);font-weight:600;font-size:15px;text-decoration:none;transition:transform .08s,box-shadow .08s}
+  .btn:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink)}
+  .btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--ink)}
+
+  /* top */
+  .top{display:flex;align-items:center;justify-content:space-between;padding:22px 0;border-bottom:var(--border)}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font-weight:600;font-size:16px}
+  .brand img{width:36px;height:36px;border-radius:22%}
+  .top nav{display:flex;gap:26px;font-size:15px;font-weight:500}
+  .top nav a{text-decoration:none}
+  .top nav a:hover{text-decoration:underline;text-decoration-thickness:2.5px;text-underline-offset:4px;text-decoration-color:var(--yellow)}
+
+  /* hero */
+  .hero{padding:64px 0 80px}
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .hero h1{font-size:clamp(40px,5.4vw,68px);margin:22px 0 22px;max-width:11ch}
+  .hero h1 mark{background:none;color:var(--ink);box-shadow:inset 0 -.28em 0 var(--yellow)}
+  .hero .sub{font-size:19px;max-width:48ch;color:var(--ink)}
+  .hero .meta{margin:16px 0 28px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .hero .meta b{font-weight:600;color:var(--ink)}
+  .ctas{display:flex;flex-wrap:wrap;align-items:center;gap:16px 22px}
+  .ctas .note{font-size:13px;color:var(--muted)}
+
+  /* the screen */
+  .screen-wrap{position:relative}
+  .screen-label{display:flex;justify-content:space-between;font-family:var(--px);font-size:9px;line-height:1.8;margin-bottom:12px;color:var(--ink)}
+  .screen-label span:last-child{color:var(--muted)}
+  .screen{position:relative;aspect-ratio:4/3;background:var(--ink);border:var(--border);border-radius:6px;box-shadow:6px 6px 0 var(--yellow),6px 6px 0 2.5px var(--ink);overflow:hidden}
+  .map{position:absolute;inset:0;background:url("assets/map.jpg") center 30%/cover no-repeat;opacity:.26;image-rendering:pixelated}
+  .ground{position:absolute;left:0;right:0;bottom:0;height:20%;background:#1E1E22;border-top:3px solid #3A3A40}
+  .ground::before{content:"";position:absolute;left:0;right:0;top:46%;height:3px;background:repeating-linear-gradient(90deg,var(--yellow) 0 18px,transparent 18px 34px);opacity:.9}
+  .hud{position:absolute;left:4%;top:5%;font-family:var(--px);font-size:8px;line-height:1.9;color:#fff;z-index:6}
+  .hud b{color:var(--yellow);font-weight:400}
+  .bldg{position:absolute;left:50%;bottom:17%;width:54%;transform:translateX(-50%);transform-origin:50% 100%;animation:bldg 7s linear infinite;z-index:3}
+  .bldg img{width:100%;height:auto}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;animation:flash 7s linear infinite;z-index:8;pointer-events:none}
+  .shards{position:absolute;left:50%;bottom:34%;width:0;height:0;z-index:4}
+  .shard{position:absolute;left:-7px;top:-7px;width:14px;height:14px;background:var(--c);opacity:0;animation:shard 7s cubic-bezier(.2,.6,.4,1) infinite}
+  .flag{position:absolute;right:8%;bottom:17%;width:17%;z-index:5;transform:translateY(-240%);animation:flag 7s linear infinite}
+  .flag img{width:100%;height:auto}
+  .banner{position:absolute;left:0;right:0;top:13%;background:#E3221B;border-top:4px solid #8F0F0B;border-bottom:4px solid #8F0F0B;padding:14px 8%;transform:translateX(-110%);animation:banner 7s linear infinite;z-index:7}
+  .banner span{display:block;font-family:var(--px);color:#E8D21C;font-size:clamp(14px,2.1vw,22px);line-height:1.5;text-shadow:3px 3px 0 #000}
+  .paused *{animation-play-state:paused!important}
+
+  @keyframes bldg{
+    0%{transform:translate(-50%,-150%) scale(1,1);opacity:1}
+    11%{transform:translate(-50%,0) scale(1,1)}
+    13.5%{transform:translate(-50%,0) scale(1.14,.8)}
+    15.5%{transform:translate(-50%,0) scale(.96,1.06)}
+    17%{transform:translate(-50%,0) scale(1,1);opacity:1}
+    18.6%{opacity:1}
+    18.7%,100%{opacity:0;transform:translate(-50%,0) scale(1,1)}
+  }
+  @keyframes flash{0%,17%{opacity:0}18%{opacity:.95}18.6%{opacity:.7}21%,100%{opacity:0}}
+  @keyframes shard{
+    0%,18.5%{opacity:0;transform:translate(0,0) rotate(0)}
+    18.6%{opacity:1;transform:translate(0,0) rotate(0)}
+    23%{transform:translate(calc(var(--dx)*.45),var(--dy)) rotate(90deg)}
+    30%{opacity:1;transform:translate(var(--dx),130px) rotate(200deg)}
+    31.5%,100%{opacity:0;transform:translate(var(--dx),130px) rotate(200deg)}
+  }
+  @keyframes flag{
+    0%,29%{transform:translateY(-240%)}
+    34%{transform:translateY(0)}
+    35.5%{transform:translateY(0) scale(1.06,.94)}
+    37%{transform:translateY(0) scale(1,1)}
+    96%{transform:translateY(0);opacity:1}
+    97%,100%{transform:translateY(0);opacity:0}
+  }
+  @keyframes banner{
+    0%,37%{transform:translateX(-110%);opacity:1}
+    42%{transform:translateX(0)}
+    93%{transform:translateX(0);opacity:1}
+    97%,100%{transform:translateX(0);opacity:0}
+  }
+
+  /* sections */
+  section{padding:72px 0}
+  section + section{border-top:var(--border)}
+  .sec-head{margin-bottom:40px;max-width:60ch}
+  .sec-head h2{font-size:clamp(30px,3.6vw,44px);margin:16px 0 14px}
+  .sec-head p{color:var(--muted);font-size:17px}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  .step{padding:26px 24px 28px}
+  .step .n{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:600;font-size:13px;font-variant-numeric:tabular-nums}
+  .step h3{font-family:var(--display);font-weight:900;letter-spacing:-.025em;font-size:24px;margin:18px 0 10px;line-height:1.1}
+  .step p{font-size:16px;color:var(--muted)}
+  .step .line{height:2.5px;background:var(--ink);margin:18px 0 0;width:48px}
+  .step .swatches{display:flex;gap:6px;margin-top:18px}
+  .step .swatches i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);background:var(--c)}
+  .strike-demo{margin-top:18px;font-size:16px;position:relative;display:inline-block;padding:2px 0}
+  .strike-demo::after{content:"";position:absolute;left:-2px;top:52%;height:3px;width:0;background:var(--red);border-radius:2px;transform:rotate(-1.5deg);animation:strike 4s ease-in-out infinite}
+  @keyframes strike{0%,15%{width:0}45%,80%{width:calc(100% + 4px)}100%{width:calc(100% + 4px);opacity:0}}
+
+  /* pack board */
+  .board{overflow:hidden}
+  .board-head{display:grid;grid-template-columns:1fr auto;padding:14px 22px;border-bottom:var(--border);background:var(--ink);color:#fff;font-family:var(--px);font-size:9px;line-height:1.8}
+  .row{display:grid;grid-template-columns:34px 1fr auto;gap:0 18px;align-items:center;padding:20px 22px;border-bottom:2.5px solid var(--ink);position:relative;background:var(--enamel)}
+  .row:last-child{border-bottom:0}
+  .row.free{box-shadow:inset 8px 0 0 var(--yellow)}
+  .row .dot{width:26px;height:26px;border-radius:50%;background:var(--c);border:2.5px solid var(--ink)}
+  .row h3{font-family:var(--display);font-weight:900;letter-spacing:-.03em;font-size:24px;line-height:1.1}
+  .row h3 small{font-family:var(--body);font-weight:500;letter-spacing:0;font-size:13px;color:var(--muted);margin-left:10px}
+  .row ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px 0;font-size:15px;color:var(--muted)}
+  .row ul li + li::before{content:"·";margin:0 10px;color:var(--grey)}
+  .tag{display:inline-block;font-weight:600;font-size:12px;letter-spacing:.04em;padding:6px 10px;border:2.5px solid var(--ink);border-radius:6px;background:var(--enamel);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tag.free{background:var(--ink);color:#fff}
+  .row .art{position:absolute;right:120px;top:50%;transform:translateY(-50%);height:48px;opacity:.95}
+  .board-foot{padding:14px 22px;font-size:14px;color:var(--muted);border-top:var(--border);background:var(--paper)}
+
+  /* this week */
+  .week-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:start}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:16px}
+  thead th{font-family:var(--px);font-size:9px;line-height:1.8;text-align:left;padding:14px 18px;background:var(--ink);color:#fff;font-weight:400}
+  td{padding:14px 18px;border-top:2.5px solid var(--ink)}
+  tbody tr:first-child td{border-top:0}
+  th:not(:first-child),td:not(:first-child){text-align:right}
+  td.stops{font-weight:600}
+  tr.today td{background:var(--yellow)}
+  tr.today td:first-child::after{content:"Today";font-size:11px;font-weight:600;margin-left:10px;padding:2px 6px;border:2px solid var(--ink);border-radius:4px;vertical-align:middle}
+  tr.future td{color:var(--grey)}
+  .cap{margin-top:16px;font-size:14px;color:var(--muted)}
+  .cap b{color:var(--ink);font-weight:600}
+  .strip{padding:22px 22px 24px}
+  .strip h3{font-family:var(--display);font-weight:900;letter-spacing:-.03em;font-size:22px;margin-bottom:14px}
+  .squares{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .squares i{aspect-ratio:1;border:2.5px solid var(--ink);border-radius:4px;background:var(--enamel);display:block}
+  .squares i.done{background:var(--ink)}
+  .squares i.now{background:var(--yellow)}
+  .squares i.off{border-color:var(--rule)}
+  .strip p{font-size:15px;color:var(--muted);margin-top:14px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:14px}
+  .legend span::before{content:"";display:inline-block;width:11px;height:11px;border:2px solid var(--ink);border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c,#fff)}
+
+  /* streak */
+  .streak{display:grid;grid-template-columns:300px 1fr;gap:0;overflow:hidden}
+  .streak .num{padding:34px 28px;border-right:var(--border);background:var(--paper);display:flex;flex-direction:column;justify-content:center}
+  .streak .num .big{font-size:clamp(96px,12vw,160px);line-height:.9;margin:10px 0 6px}
+  .streak .num small{font-size:14px;color:var(--muted)}
+  .streak .copy{padding:34px 36px}
+  .streak .copy p{margin-bottom:16px}
+  .streak .copy h3{font-family:var(--display);font-weight:900;letter-spacing:-.03em;font-size:26px;margin-bottom:14px}
+  .settings{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin:22px 0 10px;padding:0;list-style:none;font-size:15px}
+  .settings li{display:flex;gap:10px;align-items:flex-start}
+  .settings li::before{content:"";width:12px;height:12px;border-radius:50%;border:2.5px solid var(--ink);background:var(--c,#fff);flex:none;margin-top:5px}
+  .streak .dry{font-weight:600}
+
+  /* footer */
+  footer{border-top:var(--border);padding:48px 0 72px}
+  .foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px}
+  .foot .l{display:flex;align-items:center;gap:18px}
+  .foot .l img.ic{width:44px;height:44px;border-radius:22%;border:2.5px solid var(--ink)}
+  .foot .made{font-size:14px;color:var(--muted)}
+  .foot nav{display:flex;gap:22px;font-size:14px;font-weight:500}
+  .foot nav a{text-decoration:none}
+  .foot nav a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+  .foot .car{flex-basis:100%;position:relative;height:36px;overflow:hidden;border-bottom:2.5px solid var(--ink);margin-top:8px}
+  .foot .car img{position:absolute;bottom:2px;left:-130px;height:30px;width:auto;animation:drive 10s linear infinite}
+  @keyframes drive{to{transform:translateX(calc(100vw + 260px))}}
+
+  /* responsive */
+  @media (max-width:980px){
+    .hero-grid{grid-template-columns:1fr;gap:44px}
+    .screen-wrap{max-width:640px}
+    .week-grid{grid-template-columns:1fr}
+    .row .art{display:none}
+  }
+  @media (max-width:720px){
+    body{font-size:16px}
+    .top nav{display:none}
+    .hero{padding:44px 0 60px}
+    .hero h1{font-size:clamp(36px,10vw,48px)}
+    .steps{grid-template-columns:1fr}
+    .streak{grid-template-columns:1fr}
+    .streak .num{border-right:0;border-bottom:var(--border)}
+    .settings{grid-template-columns:1fr}
+    .row{grid-template-columns:26px 1fr;gap:10px 14px;padding:18px 16px}
+    .row .dot{width:20px;height:20px}
+    .row .tag-cell{grid-column:2}
+    .row h3{font-size:21px}
+    section{padding:56px 0}
+  }
+  @media (max-width:430px){
+    .wrap{width:calc(100% - 32px)}
+    .hero h1{font-size:34px}
+    .streak .copy{padding:26px 22px}
+    tr.today td:first-child::after{display:none}
+    .foot .car{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .bldg,.shard,.flash{display:none}
+    .flag,.banner{transform:none}
+    .strike-demo::after{width:calc(100% + 4px)}
+    .foot .car{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap top">
+  <a class="brand" href="#"><img src="assets/icon.png" alt="ToDOMax app icon">ToDOMax</a>
+  <nav aria-label="Primary">
+    <a href="#how">How it works</a>
+    <a href="#packs">Packs</a>
+    <a href="#week">This week</a>
+    <a href="https://apps.apple.com/app/id6819252094">Get the app</a>
+  </nav>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">ToDOMax · iOS</span>
+        <h1 class="display">The reward is <mark>three seconds</mark> long.</h1>
+        <p class="sub">ToDOMax is a to-do list. Cross something off and a full-screen pixel scene plays: a landmark drops in, a hydrant goes off, a receipt prints. Three seconds. Then it gets out of the way.</p>
+        <p class="meta"><b>Free on iOS</b> · Two packs included · Paid packs are one-time, no subscription</p>
+        <div class="ctas">
+          <a class="badge" href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+          <a class="btn" href="#how">How it works</a>
+        </div>
+      </div>
+
+      <div class="screen-wrap" id="cabinet">
+        <div class="screen-label"><span>ERRAND RUN · LANDMARK</span><span>3.0 SEC</span></div>
+        <div class="screen" role="img" aria-label="Animated 8-bit scene: a Manhattan building drops in, shatters into shards, a flag plants, and a red banner reads Errand Complete!">
+          <div class="map"></div>
+          <div class="ground"></div>
+          <div class="hud">STOP 03/05<br><b>BIG · BLUE LINE</b></div>
+          <div class="bldg"><img class="pixel" src="assets/building.png" alt="" width="310" height="180"></div>
+          <div class="shards" aria-hidden="true">
+            <span class="shard" style="--c:#6FA3D1;--dx:-150px;--dy:-120px"></span>
+            <span class="shard" style="--c:#3E6E9E;--dx:-110px;--dy:-170px"></span>
+            <span class="shard" style="--c:#4F9A3A;--dx:-70px;--dy:-200px"></span>
+            <span class="shard" style="--c:#C9D3DC;--dx:-30px;--dy:-150px"></span>
+            <span class="shard" style="--c:#6FA3D1;--dx:20px;--dy:-210px"></span>
+            <span class="shard" style="--c:#3E6E9E;--dx:60px;--dy:-160px"></span>
+            <span class="shard" style="--c:#4F9A3A;--dx:110px;--dy:-190px"></span>
+            <span class="shard" style="--c:#C9D3DC;--dx:150px;--dy:-130px"></span>
+            <span class="shard" style="--c:#6FA3D1;--dx:-180px;--dy:-60px"></span>
+            <span class="shard" style="--c:#C9D3DC;--dx:190px;--dy:-80px"></span>
+            <span class="shard" style="--c:#3E6E9E;--dx:-50px;--dy:-90px"></span>
+            <span class="shard" style="--c:#4F9A3A;--dx:80px;--dy:-100px"></span>
+          </div>
+          <div class="flag"><img class="pixel" src="assets/flag.png" alt="" width="180" height="210"></div>
+          <div class="flash"></div>
+          <div class="banner"><span>ERRAND</span><span>COMPLETE!</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">HOW IT WORKS</span>
+        <h2 class="display">Three steps. The third one is the point.</h2>
+        <p>Items are stops. Today's list is a route. Crossing one off is a strike, and every strike plays a scene.</p>
+      </div>
+      <div class="steps">
+        <article class="card step">
+          <span class="n">1</span>
+          <h3>Add a stop</h3>
+          <p>Say if it's small, medium or big. If you want, give it a colored line to group it with other things. Seven lines, same as the subway.</p>
+          <div class="swatches" aria-label="Line colors">
+            <i style="--c:#EE352E"></i><i style="--c:#0039A6"></i><i style="--c:#00933C"></i><i style="--c:#FF6319"></i><i style="--c:#B933AD"></i><i style="--c:#FCCC0A"></i><i style="--c:#808183"></i>
+          </div>
+        </article>
+        <article class="card step">
+          <span class="n">2</span>
+          <h3>Cross it off</h3>
+          <p>Drag your finger through it. The ink follows across the text. Not a checkbox.</p>
+          <span class="strike-demo">Pick up dry cleaning</span>
+        </article>
+        <article class="card step">
+          <span class="n">3</span>
+          <h3>A scene plays</h3>
+          <p>Three seconds, full screen, pixel art. Dealt from a shuffle, so you don't get the same one twice in a row.</p>
+          <div class="line"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- PICK A PACK -->
+  <section id="packs">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">PACKS</span>
+        <h2 class="display">Five packs. Two come with the app.</h2>
+        <p>A pack is a set of scenes. The ones you've seen go on the Collection board, which is basically a trophy case.</p>
+      </div>
+      <div class="card board">
+        <div class="board-head"><span>PACK · CELEBRATIONS</span><span>PRICE</span></div>
+        <div class="row free">
+          <span class="dot" style="--c:#EE352E"></span>
+          <div>
+            <h3>Errand Run <small>Signature set</small></h3>
+            <ul><li>Landmark shatters</li><li>Route inks the city</li><li>Beat the clock</li><li>You're on fire (two in one day)</li></ul>
+          </div>
+          <img class="art pixel" src="assets/building.png" alt="">
+          <span class="tag-cell"><span class="tag free">FREE</span></span>
+        </div>
+        <div class="row free">
+          <span class="dot" style="--c:#00933C"></span>
+          <div>
+            <h3>Starter</h3>
+            <ul><li>Stamps</li><li>Confetti</li><li>Level Clear</li></ul>
+          </div>
+          <span class="tag-cell"><span class="tag free">FREE</span></span>
+        </div>
+        <div class="row">
+          <span class="dot" style="--c:#0039A6"></span>
+          <div>
+            <h3>Game Day</h3>
+            <ul><li>Touchdown</li><li>Interception</li><li>Halftime band</li></ul>
+          </div>
+          <span class="tag-cell"><span class="tag">$1.99</span></span>
+        </div>
+        <div class="row">
+          <span class="dot" style="--c:#FF6319"></span>
+          <div>
+            <h3>Garage</h3>
+            <ul><li>Checkered flag</li><li>Burnout</li><li>Pixel sedan</li></ul>
+          </div>
+          <img class="art pixel" src="assets/car.png" alt="">
+          <span class="tag-cell"><span class="tag">$1.99</span></span>
+        </div>
+        <div class="row">
+          <span class="dot" style="--c:#B933AD"></span>
+          <div>
+            <h3>Checkout</h3>
+            <ul><li>Receipt</li><li>Cash drawer</li><li>Flying coins</li></ul>
+          </div>
+          <span class="tag-cell"><span class="tag">$1.99</span></span>
+        </div>
+        <div class="board-foot">Paid packs are one-time. Nothing renews.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THIS WEEK -->
+  <section id="week">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">THIS WEEK</span>
+        <h2 class="display">What it keeps track of.</h2>
+        <p>How many you crossed off each day, and the streak that comes from that. Nothing about what the things were.</p>
+      </div>
+      <div class="week-grid">
+        <div>
+          <div class="card" style="overflow:hidden">
+            <table>
+              <thead><tr><th>DAY</th><th>STOPS</th><th>STREAK</th></tr></thead>
+              <tbody>
+                <tr><td>Monday</td><td class="stops">4</td><td>5</td></tr>
+                <tr><td>Tuesday</td><td class="stops">6</td><td>6</td></tr>
+                <tr><td>Wednesday</td><td class="stops">3</td><td>7</td></tr>
+                <tr><td>Thursday</td><td class="stops">5</td><td>8</td></tr>
+                <tr class="today"><td>Friday</td><td class="stops">2</td><td>9</td></tr>
+                <tr class="future"><td>Saturday</td><td>—</td><td>—</td></tr>
+                <tr class="future"><td>Sunday</td><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="cap"><b>The table is shareable.</b> Your tasks aren't on it.</p>
+        </div>
+        <aside class="card strip">
+          <h3>Daily Route</h3>
+          <div class="squares" aria-label="Today's route: five stops, two struck, one in progress">
+            <i class="done"></i><i class="done"></i><i class="now"></i><i></i><i></i><i class="off"></i><i class="off"></i>
+          </div>
+          <div class="legend"><span style="--c:#0B0B0C">Struck</span><span style="--c:#FCCC0A">Up next</span><span>Still to go</span></div>
+          <p>The Daily Route strip is today as a row of squares. The Map lays the same stops out as a route across the city. Both stay on your phone.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- STREAK -->
+  <section id="streak">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">STREAK</span>
+        <h2 class="display">The streak.</h2>
+      </div>
+      <div class="card streak">
+        <div class="num">
+          <span class="eyebrow">DAYS IN A ROW</span>
+          <div class="big display">9</div>
+          <small>One a day keeps it going. Miss a day and it starts over.</small>
+        </div>
+        <div class="copy">
+          <h3>It's a number. It can go down.</h3>
+          <p>Consecutive days with at least one thing crossed off. It's the only number in the app that can go down, and when it does, nothing happens. No reminders, no red badge on the icon. It sits on the Daily Route strip until you're back.</p>
+          <ul class="settings">
+            <li style="--c:#0039A6">Quiet hours — after a time you pick, scenes go minimal</li>
+            <li style="--c:#00933C">Sound — low, full or off</li>
+            <li style="--c:#FF6319">Haptics — on or off</li>
+            <li style="--c:#B933AD">Reduce Motion — respected. The scene still plays, the motion doesn't</li>
+            <li style="--c:#EE352E">Your own photo as the background</li>
+            <li style="--c:#808183">Two looks: Signal and Classic</li>
+          </ul>
+          <p class="dry">No pop-ups. No badge. A number.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="l">
+      <img class="ic" src="assets/icon.png" alt="ToDOMax app icon">
+      <a class="badge" href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+    </div>
+    <p class="made">Made with love in Brooklyn.</p>
+    <nav aria-label="Footer">
+      <a href="#">Privacy</a>
+      <a href="#">Support</a>
+      <a href="#how">How it works</a>
+    </nav>
+    <div class="car" aria-hidden="true"><img class="pixel" src="assets/car.png" alt="" width="260" height="100"></div>
+  </div>
+</footer>
+
+<script>
+  // Pause the celebration loop when the screen is scrolled out of view.
+  (function(){
+    var el=document.getElementById('cabinet');
+    if(!el||!('IntersectionObserver' in window))return;
+    new IntersectionObserver(function(entries){
+      entries.forEach(function(e){el.classList.toggle('paused',!e.isIntersecting);});
+    },{threshold:0.05}).observe(el);
+  })();
+</script>
+</body>
+</html>

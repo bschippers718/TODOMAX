@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ToDOMax — You cross it off. Something happens.</title>
+<meta name="description" content="ToDOMax is a to-do list for iOS. Cross something off with your finger and a three-second pixel scene plays. Free, two packs included.">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@900&amp;family=Inter:wght@400;500;600&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F6F3EC;
+    --enamel: #FFFFFF;
+    --ink: #0B0B0C;
+    --yellow: #FCCC0A;
+    --red: #EE352E;
+    --green: #00933C;
+    --blue: #0039A6;
+    --orange: #FF6319;
+    --purple: #B933AD;
+    --grey: #808183;
+    --bw: 2.5px;
+    --r: 6px;
+    --max: 1100px;
+    --display: 'Archivo', 'Inter', system-ui, sans-serif;
+    --body: 'Inter', system-ui, -apple-system, sans-serif;
+    --pixel: 'Press Start 2P', monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; }
+  h1, h2, h3, p { margin: 0; }
+
+  .wrap { width: min(var(--max), 100% - 48px); margin-inline: auto; }
+  @media (max-width: 600px) { .wrap { width: min(var(--max), 100% - 36px); } }
+
+  /* ---------- type ---------- */
+  .display { font-family: var(--display); font-weight: 900; letter-spacing: -0.035em; line-height: 0.95; }
+  .eyebrow {
+    font-family: var(--pixel); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+    line-height: 1.6; display: inline-flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 10px; height: 10px; background: var(--ink); }
+  .eyebrow.yellow::before { background: var(--yellow); }
+  .eyebrow.red::before { background: var(--red); }
+  .eyebrow.green::before { background: var(--green); }
+  .eyebrow.blue::before { background: var(--blue); }
+  .h2 { font-size: clamp(34px, 4.6vw, 58px); max-width: 17ch; }
+  .lede { font-size: clamp(17px, 1.4vw, 20px); line-height: 1.45; max-width: 44ch; color: #2A2A2D; }
+
+  /* ---------- service strip ---------- */
+  .strip { display: grid; grid-template-columns: repeat(7, 1fr); height: 10px; }
+  .strip i { display: block; }
+  .strip i:nth-child(1) { background: var(--red); }
+  .strip i:nth-child(2) { background: var(--blue); }
+  .strip i:nth-child(3) { background: var(--green); }
+  .strip i:nth-child(4) { background: var(--orange); }
+  .strip i:nth-child(5) { background: var(--purple); }
+  .strip i:nth-child(6) { background: var(--yellow); }
+  .strip i:nth-child(7) { background: var(--grey); }
+
+  /* ---------- nav ---------- */
+  .nav { border-bottom: var(--bw) solid var(--ink); background: var(--enamel); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font-family: var(--display); font-weight: 900; letter-spacing: -0.03em; font-size: 20px; }
+  .brand img { width: 34px; height: 34px; border-radius: 22%; border: 2px solid var(--ink); }
+  .nav-cta {
+    font-family: var(--pixel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none;
+    background: var(--yellow); border: var(--bw) solid var(--ink); padding: 11px 14px 9px; box-shadow: 4px 4px 0 var(--ink);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .nav-cta:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: clamp(56px, 8vw, 112px) 0 clamp(48px, 6vw, 96px); }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+  .hero h1 { font-size: clamp(42px, 5.6vw, 70px); margin: 22px 0 26px; }
+  .hero h1 .nw { white-space: nowrap; }
+  .hero h1 .ul { position: relative; display: inline-block; }
+  .hero h1 .ul::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0.04em; height: 0.12em; background: var(--yellow); z-index: -1; }
+  .hero h1 .ul { z-index: 0; }
+  .hero .lede { max-width: 40ch; }
+  .cta { margin-top: 36px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+  .badge { display: inline-block; padding: 6px; margin: -6px; line-height: 0; }
+  .badge img { height: 48px; width: auto; }
+  .fine { font-size: 13px; color: #4C4C50; margin: 0; }
+
+  /* ---------- phone ---------- */
+  .phone-slot { --ps: 0.78; display: flex; justify-content: center; }
+  .phone-box { width: calc(390px * var(--ps)); height: calc(844px * var(--ps)); position: relative; }
+  .phone {
+    width: 390px; height: 844px; transform: scale(var(--ps)); transform-origin: 0 0;
+    background: var(--paper); border: var(--bw) solid var(--ink); border-radius: 44px;
+    box-shadow: 8px 8px 0 var(--ink); overflow: hidden; position: relative;
+  }
+  .phone::before { /* dynamic island */
+    content: ""; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 34px; background: var(--ink); border-radius: 20px;
+  }
+  .screen { padding: 68px 20px 0; height: 100%; display: flex; flex-direction: column; }
+  .p-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .p-head .eyebrow { font-size: 9px; }
+  .p-head .streak { font-family: var(--pixel); font-size: 9px; color: var(--grey); }
+  .p-title { font-size: 42px; margin: 14px 0 18px; }
+  .p-title b { color: var(--ink); }
+  .route { display: flex; gap: 6px; margin-bottom: 22px; }
+  .route i { width: 22px; height: 22px; border: 2px solid var(--ink); display: block; background: var(--enamel); }
+  .route i.f-green { background: var(--green); } .route i.f-purple { background: var(--purple); }
+  .route i.f-blue { background: var(--blue); } .route i.f-ink { background: var(--ink); }
+  .route i.f-yellow { background: var(--yellow); } .route i.f-red { background: var(--red); }
+
+  .stop {
+    position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 14px; align-items: start;
+    background: var(--enamel); border: var(--bw) solid var(--ink); border-radius: var(--r);
+    box-shadow: 4px 4px 0 var(--ink); padding: 16px 16px 14px; margin-bottom: 16px; color: var(--ink);
+  }
+  .bullet {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--enamel);
+    font-family: var(--display); font-weight: 900; font-size: 14px; display: grid; place-items: center; line-height: 1;
+  }
+  .stop .t { font-weight: 600; font-size: 17px; line-height: 1.3; letter-spacing: -0.01em; display: inline-block; position: relative; }
+  .stop .m { font-family: var(--pixel); font-size: 8px; letter-spacing: 0.06em; margin-top: 10px; opacity: .8; }
+  .stop.line-blue { background: var(--blue); color: #fff; }
+  .stop.line-red { background: var(--red); color: #fff; }
+  .stop.line-orange { background: var(--orange); color: #fff; }
+  .stop.line-blue .bullet { background: #fff; color: var(--blue); }
+  .stop.line-red .bullet { background: #fff; color: var(--red); }
+  .stop.line-orange .bullet { background: #fff; color: var(--orange); }
+
+  /* strike animation */
+  .stop.strike { animation: dim 6s linear infinite; }
+  .stop.strike .t::after {
+    content: ""; position: absolute; left: -4px; top: 58%; height: 8px; width: 0;
+    background: var(--yellow); border-radius: 5px 6px 4px 6px;
+    transform: translateY(-50%) rotate(-1.3deg); transform-origin: left center;
+    animation: ink 6s cubic-bezier(.3,.0,.2,1) infinite; pointer-events: none;
+  }
+  @keyframes ink {
+    0%   { width: 0; opacity: 1; }
+    15%  { width: calc(100% + 8px); opacity: 1; }
+    90%  { width: calc(100% + 8px); opacity: 1; }
+    94%  { width: calc(100% + 8px); opacity: 0; }
+    100% { width: 0; opacity: 0; }
+  }
+  @keyframes dim {
+    0%, 15% { opacity: 1; }
+    21%, 90% { opacity: .42; }
+    95%, 100% { opacity: 1; }
+  }
+  .p-foot { margin-top: auto; padding: 0 0 18px; display: flex; justify-content: space-between; align-items: center; }
+  .p-foot .add {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--yellow); border: var(--bw) solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink); font-family: var(--display); font-weight: 900; font-size: 30px; display: grid; place-items: center; line-height: 1;
+  }
+  .p-foot .tabs { font-family: var(--pixel); font-size: 8px; display: flex; gap: 18px; color: var(--grey); }
+  .p-foot .tabs b { color: var(--ink); font-weight: normal; }
+
+  /* ---------- sections ---------- */
+  section { padding: clamp(56px, 7vw, 104px) 0; }
+  .sec-head { display: grid; gap: 18px; margin-bottom: clamp(32px, 4vw, 56px); }
+  .black { background: var(--ink); color: var(--paper); }
+  .black .lede { color: #C9C6BE; }
+
+  /* three moves */
+  .moves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .move {
+    background: var(--enamel); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 6px 6px 0 var(--ink);
+    padding: 26px 24px 28px; display: grid; gap: 18px; align-content: start;
+  }
+  .move .bullet { width: 44px; height: 44px; font-size: 22px; }
+  .move:nth-child(1) .bullet { background: var(--blue); }
+  .move:nth-child(2) .bullet { background: var(--yellow); color: var(--ink); }
+  .move:nth-child(3) .bullet { background: var(--red); }
+  .move h3 { font-size: 30px; }
+  .move p { color: #2A2A2D; font-size: 16px; }
+
+  /* packs */
+  .packs-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(28px, 4vw, 56px); align-items: start; }
+  .board { border: var(--bw) solid var(--paper); border-radius: var(--r); overflow: hidden; background: var(--ink); }
+  .board-head {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 16px; padding: 12px 18px; font-family: var(--pixel); font-size: 9px;
+    color: var(--ink); background: var(--yellow); border-bottom: var(--bw) solid var(--paper);
+  }
+  .row {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 16px; align-items: center; padding: 18px;
+    border-bottom: var(--bw) solid var(--paper); color: var(--paper);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .bullet { width: 34px; height: 34px; font-size: 16px; color: #fff; }
+  .row .name { font-family: var(--display); font-weight: 900; font-size: 22px; letter-spacing: -0.03em; line-height: 1; }
+  .row .desc { font-size: 14px; color: #C9C6BE; margin-top: 6px; }
+  .row .price { font-family: var(--pixel); font-size: 10px; text-align: right; }
+  .row .price.free { color: var(--yellow); }
+  .row .tag { font-family: var(--pixel); font-size: 7px; color: var(--yellow); margin-left: 10px; vertical-align: 2px; }
+
+  .screen-box {
+    border: var(--bw) solid var(--paper); border-radius: var(--r); background: #000; aspect-ratio: 4 / 3; position: relative; overflow: hidden;
+    box-shadow: 6px 6px 0 var(--paper);
+    image-rendering: pixelated;
+  }
+  .screen-box .sky { position: absolute; inset: 0; background: linear-gradient(180deg, #1B2B5A 0%, #1B2B5A 62%, #000 62%); }
+  .screen-box .stars { position: absolute; inset: 0; background:
+    radial-gradient(circle at 12% 18%, #fff 1px, transparent 2px), radial-gradient(circle at 48% 9%, #fff 1px, transparent 2px),
+    radial-gradient(circle at 78% 22%, #fff 1px, transparent 2px), radial-gradient(circle at 90% 44%, #fff 1px, transparent 2px),
+    radial-gradient(circle at 30% 36%, #fff 1px, transparent 2px); }
+  .screen-box .ground { position: absolute; left: 0; right: 0; bottom: 0; height: 14%; background: repeating-linear-gradient(90deg, #2E2E31 0 14px, #3A3A3E 14px 28px); border-top: 3px solid #555; }
+  .screen-box .bldg { position: absolute; left: 50%; bottom: 14%; width: 62%; transform: translateX(-50%); animation: drop 4s cubic-bezier(.6,0,.8,.2) infinite; }
+  .screen-box .flag { position: absolute; right: 7%; bottom: 14%; width: 16%; }
+  @keyframes drop { 0% { transform: translate(-50%, -140%); } 18% { transform: translate(-50%, 0); } 21% { transform: translate(-50%, 2%) scaleY(.96); } 24%, 100% { transform: translate(-50%, 0); } }
+  .banner {
+    position: absolute; left: 0; right: 0; top: 36%; background: var(--red); border-top: 4px solid #000; border-bottom: 4px solid #000;
+    padding: 16px 0; text-align: center; font-family: var(--pixel); font-size: clamp(14px, 2.6vw, 24px); color: var(--yellow);
+    text-shadow: 3px 3px 0 #000; letter-spacing: 0.02em;
+  }
+  .screen-cap { margin-top: 20px; font-size: 14px; color: #C9C6BE; display: flex; justify-content: space-between; gap: 16px; }
+  .screen-cap .eyebrow { color: var(--yellow); }
+  .screen-cap .eyebrow::before { background: var(--yellow); }
+
+  /* daily route */
+  .dr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: center; }
+  .share {
+    background: var(--enamel); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 6px 6px 0 var(--ink);
+    padding: 34px 34px 26px; display: grid; justify-items: center; gap: 22px; max-width: 460px; margin-inline: auto; width: 100%;
+  }
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; width: 100%; }
+  .week i { display: block; aspect-ratio: 1; border: var(--bw) solid var(--ink); background: var(--enamel); }
+  .week .d1 { background: var(--blue); } .week .d2 { background: var(--red); } .week .d3 { background: var(--green); }
+  .week .d4 { background: var(--purple); } .week .d5 { background: var(--yellow); }
+  .share .site { font-size: 11px; font-family: var(--body); color: var(--grey); letter-spacing: 0.02em; }
+  .share .meta { font-family: var(--pixel); font-size: 8px; width: 100%; display: flex; justify-content: space-between; color: var(--ink); }
+
+  /* features */
+  .feats { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--bw) solid var(--ink); border-radius: var(--r); overflow: hidden; background: var(--ink); gap: var(--bw); box-shadow: 6px 6px 0 var(--ink); }
+  .feat { background: var(--enamel); padding: 24px 22px 26px; display: grid; gap: 8px; align-content: start; }
+  .feat .eyebrow { font-size: 8px; }
+  .feat h3 { font-family: var(--display); font-weight: 900; font-size: 22px; letter-spacing: -0.03em; line-height: 1; }
+  .feat p { font-size: 15px; color: #2A2A2D; }
+
+  /* footer */
+  footer { background: var(--enamel); border-top: var(--bw) solid var(--ink); padding: 48px 0 40px; }
+  footer .wrap { display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center; }
+  .f-brand { display: flex; align-items: center; gap: 14px; }
+  .f-brand img { width: 44px; height: 44px; border-radius: 22%; border: 2px solid var(--ink); }
+  .f-brand strong { font-family: var(--display); font-weight: 900; font-size: 20px; letter-spacing: -0.03em; display: block; line-height: 1; }
+  .f-brand span { font-size: 13px; color: #4C4C50; }
+  .f-links { display: flex; gap: 22px; font-size: 14px; }
+  .f-links a { text-decoration: none; border-bottom: 2px solid var(--yellow); }
+  .f-bottom { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid #DEDAD0; font-size: 13px; color: #4C4C50; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 960px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .phone-slot { justify-content: flex-start; margin-top: 8px; }
+    .moves { grid-template-columns: 1fr; }
+    .packs-grid, .dr { grid-template-columns: 1fr; }
+    .feats { grid-template-columns: repeat(2, 1fr); }
+    .share { margin-inline: 0; }
+  }
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    .nav .wrap { height: 58px; }
+    .nav-cta { display: none; }
+    .phone-slot { --ps: 0.72; justify-content: center; }
+    .feats { grid-template-columns: 1fr; }
+    footer .wrap { grid-template-columns: 1fr; }
+    .f-links { gap: 16px; }
+  }
+  @media (max-width: 400px) { .phone-slot { --ps: 0.66; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .stop.strike { animation: none; opacity: .42; }
+    .stop.strike .t::after { animation: none; width: calc(100% + 8px); opacity: 1; }
+    .screen-box .bldg { animation: none; }
+    .nav-cta { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="assets/icon.png" alt="">ToDOMax</a>
+    <a class="nav-cta" href="https://apps.apple.com/app/id6819252094">Get it on iOS</a>
+  </div>
+</header>
+
+<main>
+  <!-- 1. HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow yellow">ToDOMax · iOS</span>
+        <h1 class="display"><span class="nw">You cross it off.</span><br>Something <span class="ul">happens.</span></h1>
+        <p class="lede">ToDOMax is a to-do list. Each item is a stop on today's route. Draw a line through one with your finger and a three-second pixel scene plays: a building drops in and shatters, a hydrant goes off. Then you're back on the list.</p>
+        <div class="cta">
+          <a class="badge" href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+          <p class="fine">Free on iOS. Two packs of celebrations included. Three more, $1.99 each.</p>
+        </div>
+      </div>
+
+      <div class="phone-slot" aria-label="ToDOMax app, route view">
+        <div class="phone-box">
+          <div class="phone">
+            <div class="screen">
+              <div class="p-head">
+                <span class="eyebrow">Monday · Oct 5</span>
+                <span class="streak">STREAK 12</span>
+              </div>
+              <div class="display p-title"><b id="count">6</b> stops to go</div>
+              <div class="route" aria-hidden="true">
+                <i class="f-green"></i><i class="f-purple"></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+
+              <div class="stop line-blue">
+                <span class="bullet">1</span>
+                <div><span class="t">Finish the pitch deck for Thursday</span><div class="m">BIG · BLUE</div></div>
+              </div>
+              <div class="stop strike">
+                <span class="bullet">2</span>
+                <div><span class="t">Return library books</span><div class="m">SMALL</div></div>
+              </div>
+              <div class="stop line-red">
+                <span class="bullet">3</span>
+                <div><span class="t">Call the dentist about the crown</span><div class="m">MEDIUM · RED</div></div>
+              </div>
+              <div class="stop line-orange">
+                <span class="bullet">4</span>
+                <div><span class="t">Pick up dry cleaning on 7th Ave</span><div class="m">SMALL · ORANGE</div></div>
+              </div>
+
+              <div class="p-foot">
+                <div class="tabs"><b>ROUTE</b><span>MAP</span><span>COLLECTION</span></div>
+                <div class="add" aria-hidden="true">+</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- 2. THREE MOVES -->
+  <section id="moves">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">How it works</span>
+        <h2 class="display h2">Three things to learn.</h2>
+      </div>
+      <div class="moves">
+        <article class="move">
+          <span class="bullet">1</span>
+          <h3 class="display">Add something.</h3>
+          <p>Type it. Say whether it's small, medium or big. If it belongs with other stuff, put it on a line. The line colors the whole card.</p>
+        </article>
+        <article class="move">
+          <span class="bullet">2</span>
+          <h3 class="display">Cross it off.</h3>
+          <p>Drag your finger across it. The ink follows. No checkbox, no swipe menu, no "are you sure."</p>
+        </article>
+        <article class="move">
+          <span class="bullet">3</span>
+          <h3 class="display">Something happens.</h3>
+          <p>A three-second pixel scene, full screen. They're dealt from a shuffle, so you don't get the same one twice in a row. Then you're back on the list.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. PACKS -->
+  <section class="black" id="packs">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow yellow">Celebrations</span>
+        <h2 class="display h2">What plays when you cross something off.</h2>
+        <p class="lede">Two packs come with the app. Three more are $1.99 each, once, no subscription. The Collection board keeps track of which ones you've seen.</p>
+      </div>
+      <div class="packs-grid">
+        <div class="board" role="table" aria-label="Celebration packs">
+          <div class="board-head" role="row"><span></span><span>PACK</span><span>PRICE</span></div>
+          <div class="row" role="row">
+            <span class="bullet" style="background: var(--red)">1</span>
+            <div><div class="name">Errand Run<span class="tag">SIGNATURE</span></div><div class="desc">A landmark drops in. A hydrant goes off.</div></div>
+            <div class="price free">FREE</div>
+          </div>
+          <div class="row" role="row">
+            <span class="bullet" style="background: var(--green)">2</span>
+            <div><div class="name">Starter</div><div class="desc">Stamps, confetti, arcade stuff.</div></div>
+            <div class="price free">FREE</div>
+          </div>
+          <div class="row" role="row">
+            <span class="bullet" style="background: var(--orange)">3</span>
+            <div><div class="name">Game Day</div><div class="desc">Touchdowns, spikes, instant replay.</div></div>
+            <div class="price">$1.99</div>
+          </div>
+          <div class="row" role="row">
+            <span class="bullet" style="background: var(--blue)">4</span>
+            <div><div class="name">Garage</div><div class="desc">Pixel sedans, checkered flags.</div></div>
+            <div class="price">$1.99</div>
+          </div>
+          <div class="row" role="row">
+            <span class="bullet" style="background: var(--purple)">5</span>
+            <div><div class="name">Checkout</div><div class="desc">Receipts and cash drawers.</div></div>
+            <div class="price">$1.99</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="screen-box" aria-label="Errand Run celebration: a Manhattan landmark drops in">
+            <div class="sky"></div>
+            <div class="stars"></div>
+            <div class="ground"></div>
+            <img class="bldg" src="assets/building.png" alt="">
+            <img class="flag" src="assets/flag.png" alt="">
+            <div class="banner">ERRAND COMPLETE!</div>
+          </div>
+          <div class="screen-cap">
+            <span class="eyebrow">Errand Run</span>
+            <span>A landmark drops in and shatters. Your route inks itself across the city. Cross off two in one day and a hydrant gets you.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. DAILY ROUTE -->
+  <section id="daily">
+    <div class="wrap dr">
+      <div class="sec-head" style="margin-bottom: 0">
+        <span class="eyebrow">The Daily Route</span>
+        <h2 class="display h2">Seven squares. That's your week.</h2>
+        <p class="lede">One square per day, filled in if you crossed something off. None of your actual tasks are on it, so you can post it without thinking about it. The streak is consecutive days.</p>
+      </div>
+      <div class="share" aria-label="Daily Route share card">
+        <div class="meta"><span>OCT 5–11</span><span>STREAK 12</span></div>
+        <div class="week" aria-hidden="true">
+          <i class="d1"></i><i class="d2"></i><i class="d3"></i><i class="d4"></i><i class="d5"></i><i></i><i></i>
+        </div>
+        <div class="site">todomax.app</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- 5. MADE FOR ADULTS -->
+  <section id="adults">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Settings</span>
+        <h2 class="display h2">It's loud. You can turn it down.</h2>
+      </div>
+      <div class="feats">
+        <div class="feat"><span class="eyebrow">Settings</span><h3>Quiet hours</h3><p>Pick a time. After it, celebrations go minimal.</p></div>
+        <div class="feat"><span class="eyebrow">Settings</span><h3>Sound and haptics</h3><p>Low, full or off. Set separately.</p></div>
+        <div class="feat"><span class="eyebrow">Accessibility</span><h3>Reduce Motion</h3><p>If it's on in iOS, it's on here. Celebrations included.</p></div>
+        <div class="feat"><span class="eyebrow">Appearance</span><h3>Your background</h3><p>Put your own photo behind the list. Two looks: Signal, which is what this page looks like, and Classic, soft cards over a city map.</p></div>
+        <div class="feat"><span class="eyebrow">Map</span><h3>Map view</h3><p>The same stops laid out as a route. Draw which one comes after which.</p></div>
+        <div class="feat"><span class="eyebrow">Collection</span><h3>Collection board</h3><p>Every celebration you've seen, on one board. The gaps are the ones you haven't.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 6. FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="f-brand">
+      <img src="assets/icon.png" alt="">
+      <div><strong>ToDOMax</strong><span>A to-do list for iOS.</span></div>
+    </div>
+    <a class="badge" href="https://apps.apple.com/app/id6819252094"><img src="assets/app-store-badge.svg" alt="Download on the App Store" height="48"></a>
+    <div class="f-bottom">
+      <span>Made with love in Brooklyn.</span>
+      <nav class="f-links" aria-label="Footer"><a href="#">Privacy</a><a href="#">Support</a></nav>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Keep the "stops to go" count in step with the strike animation.
+  (function () {
+    var count = document.getElementById('count');
+    var struck = document.querySelector('.stop.strike');
+    if (!count || !struck) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { count.textContent = '5'; return; }
+    function cycle() { count.textContent = '6'; setTimeout(function () { count.textContent = '5'; }, 1050); }
+    cycle();
+    struck.addEventListener('animationiteration', function (e) { if (e.animationName === 'dim') cycle(); });
+  })();
+</script>
+</body>
+</html>
