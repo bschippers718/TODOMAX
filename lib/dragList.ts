@@ -11,6 +11,8 @@ import { SharedValue, useSharedValue } from 'react-native-reanimated';
 export const ROW_GAP = 8; // CARD_MARGIN * 2 in TaskItem
 /** Sideways travel that reads as "tuck it under the one above" (or pull it out). */
 export const TUCK_DX = 44;
+/** How far a tucked stop steps in from the left edge. */
+export const INDENT = 22;
 
 export interface DragState {
   /** Id of the lifted card, or '' when nothing is held. */
@@ -50,9 +52,11 @@ export function useDragState(): DragState {
   );
 }
 
-/** Sideways travel of the lifted card: a hint, not a slide. */
+/** Sideways travel of the lifted card: a hint, then a snap once tuck takes. */
 export function ghostDx(dx: number): number {
   'worklet';
+  if (dx > TUCK_DX) return INDENT;
+  if (dx < -TUCK_DX) return -Math.round(INDENT * 0.45);
   return Math.max(-TUCK_DX * 0.6, Math.min(TUCK_DX * 0.75, dx * 0.7));
 }
 

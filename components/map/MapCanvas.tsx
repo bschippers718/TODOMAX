@@ -21,7 +21,9 @@ type Positions = Record<string, Point>;
 type Dims = Record<string, { w: number; h: number }>;
 
 export const CARD_WIDTH: Record<TaskSize, number> = { s: 150, m: 190, l: 240, xl: 290 };
-const GRID = { cols: 2, cellW: 212, cellH: 118, originX: 24, originY: 24 };
+/** Fit / auto-place use these so a Massive stop isn't clipped or stacked. */
+export const CARD_HEIGHT: Record<TaskSize, number> = { s: 72, m: 90, l: 132, xl: 160 };
+const GRID = { cols: 2, cellW: 310, cellH: 180, originX: 24, originY: 24 };
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
 
@@ -417,7 +419,7 @@ const MapCard = memo(function MapCard({
   // A line paints the whole card, same as on the list: the stop *is* its line.
   const paint = task.line ? lineColor(task.line, theme) : null;
   const onPaint = task.line ? onLineColor(task.line, theme) : null;
-  const border = selected ? theme.blue : linking ? theme.textTertiary : theme.cardBorder;
+  const border = selected ? (paint ? onPaint! : theme.blue) : linking ? theme.textTertiary : theme.cardBorder;
   const dot = paint ? onPaint! : signal ? theme.text : theme.textTertiary;
   const ink = paint ? onPaint! : theme.text;
 
@@ -453,7 +455,7 @@ const MapCard = memo(function MapCard({
         accessibilityLabel={task.text}
         accessibilityHint="Double tap to strike. Tap to connect to another stop. Hold and drag to move."
       >
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.green, borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }, flash]} />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: paint ? onPaint! : theme.green, borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }, flash]} />
         <View style={[styles.dot, { backgroundColor: dot, borderRadius: signal ? 2 : 5 }, isBig(size) && styles.dotL]} />
         <Text
           style={[

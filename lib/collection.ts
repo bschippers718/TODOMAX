@@ -41,7 +41,7 @@ export const ANIMATION_META: Record<AnimationId, AnimationMeta> = {
   errandComplete: { symbol: 'building.2.fill', blurb: 'A landmark shatters into shards.' },
   routeDrawn: { symbol: 'map.fill', blurb: 'Your route inks itself across the city.' },
   stopwatchStop: { symbol: 'stopwatch.fill', blurb: 'The clock runs down and freezes at zero.' },
-  hydrantBlast: { symbol: 'drop.fill', blurb: 'A hydrant lets loose on you. Two or more in a day.' },
+  hydrantBlast: { symbol: 'drop.fill', blurb: 'A hydrant lets loose. Two or more in a day, on a Big stop.' },
   // Starter
   scorePop: { symbol: 'plus.circle.fill', blurb: 'Points pop and stack.' },
   streakCombo: { symbol: 'flame.fill', blurb: 'Your streak flares up.' },

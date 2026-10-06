@@ -171,6 +171,16 @@ export default function HomeScreen() {
 
   // Hold a card to lift it. Where it lands is the new order; pushed to the
   // right on the way down, it tucks under the stop above it.
+  const listRef = useRef<FlatList<Task>>(null);
+  const handleBeginEdit = useCallback((index: number) => {
+    requestAnimationFrame(() => {
+      try {
+        listRef.current?.scrollToIndex({ index, viewPosition: 0.22, animated: true });
+      } catch {
+        /* unmeasured row — the keyboard avoider still lifts the composer */
+      }
+    });
+  }, []);
   const drag = useDragState();
   const [heldId, setHeldId] = useState('');
   const handleHold = useCallback((id: string | null) => setHeldId(id ?? ''), []);
@@ -183,7 +193,6 @@ export default function HomeScreen() {
         clearAfter(id);
         return;
       }
-      if (intent !== 'tuck') return;
       // The store has already moved; work out the new neighbour above.
       const open = tasksRef.current.filter((t) => !t.completed);
       const from = open.findIndex((t) => t.id === id);
@@ -192,18 +201,34 @@ export default function HomeScreen() {
       const [moved] = next.splice(from, 1);
       next.splice(Math.max(0, Math.min(to, next.length)), 0, moved);
       const above = next[next.indexOf(moved) - 1];
-      if (!above) return;
-      const r = linkAfter(id, above.id);
-      if (r === 'refused') {
-        showToast({
-          title: 'Kept apart',
-          subtitle: `${above.text.length > 28 ? above.text.slice(0, 28) + '…' : above.text} already waits on this one`,
-          icon: 'arrow.triangle.2.circlepath',
-          tint: theme.textSecondary,
-          durationMs: 2600,
-        });
-      } else if (r === 'linked' && settings.hapticsEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (intent === 'tuck') {
+        if (!above) {
+          showToast({
+            title: 'Nothing above',
+            subtitle: 'Drop it under a stop to tuck it',
+            icon: 'arrow.uturn.backward',
+            tint: theme.textSecondary,
+            durationMs: 2200,
+          });
+          return;
+        }
+        const r = linkAfter(id, above.id);
+        if (r === 'refused') {
+          showToast({
+            title: 'Kept apart',
+            subtitle: `${above.text.length > 28 ? above.text.slice(0, 28) + '…' : above.text} already waits on this one`,
+            icon: 'arrow.triangle.2.circlepath',
+            tint: theme.textSecondary,
+            durationMs: 2600,
+          });
+        } else if (r === 'linked' && settings.hapticsEnabled) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        return;
+      }
+      // A move that no longer sits under someone it waited on drops the nest.
+      if (moved.after?.length && (!above || !moved.after.includes(above.id))) {
+        clearAfter(id);
       }
     },
     [reorderTask, clearAfter, linkAfter, showToast, theme.textSecondary, settings.hapticsEnabled],
@@ -227,6 +252,7 @@ export default function HomeScreen() {
         onSize={setTaskSize}
         onLine={setTaskLine}
         upstream={upstreamFor(item)}
+        onBeginEdit={handleBeginEdit}
       />
     ),
     [
@@ -234,6 +260,7 @@ export default function HomeScreen() {
       drag,
       handleHold,
       handleDrop,
+      handleBeginEdit,
       settings,
       reduceMotion,
       onStrike,
@@ -555,15 +582,19 @@ export default function HomeScreen() {
         {signal ? signalHeader : classicHeader}
 
         <FlatList
+          ref={listRef}
           data={activeTasks}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           contentInsetAdjustmentBehavior="automatic"
           keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           alwaysBounceVertical
           showsVerticalScrollIndicator={false}
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({ offset: Math.max(0, info.averageItemLength * info.index), animated: true });
+          }}
           ListEmptyComponent={signal ? signalEmpty : classicEmpty}
           ListFooterComponent={completedTasks.length > 0 ? (signal ? signalStruck : classicStruck) : null}
         />

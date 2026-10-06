@@ -16,7 +16,7 @@ async function buildBag(pool: AnimationId[], key: string) {
   // Newly unlocked animations should show up soon, not after the current bag
   // drains — so fold them in on top of what's left.
   const fresh = pool.filter((id) => !remaining.includes(id));
-  const seed = remaining.length > 0 ? [...fresh, ...remaining] : undefined;
+  const seed = remaining.length > 0 ? [...remaining, ...fresh] : undefined;
   bag = new ShuffleBag(pool, seed);
   bagKey = key;
 }

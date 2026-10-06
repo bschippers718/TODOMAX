@@ -17,6 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.brooklynrunning.todomax",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -41,10 +42,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow ToDOMax to use a photo from your library as your task background."
+          "photosPermission": "Allow ToDOMax to use a photo from your library as your task background.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "microphonePermission": false
+        }
+      ],
       "expo-asset"
     ],
     "extra": {

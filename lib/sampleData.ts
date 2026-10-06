@@ -32,7 +32,7 @@ const SEEDS: Seed[] = [
   { text: 'Write the Signal style guide intro', size: 'l', line: 'red', pos: { x: 200, y: 560 }, after: [5, 6] },
   { text: 'Email the accountant about the K-1', line: 'grey', pos: { x: 20, y: 700 }, ageH: 26 },
   { text: 'Rough cut of the trailer by Sunday', size: 'xl', line: 'purple', pos: { x: 250, y: 700 } },
-  { text: 'Order new running shoes', size: 's', line: 'green', pos: { x: 510, y: 690 } },
+  { text: 'Order new running shoes', size: 's', line: 'green', pos: { x: 560, y: 690 } },
   { text: 'Prep questions for the Tuesday interview', line: 'blue', pos: { x: 30, y: 840 }, after: [0] },
   { text: 'Cancel the unused streaming sub', size: 's', line: 'grey', pos: { x: 270, y: 850 } },
   { text: 'Sketch the title card options', line: 'red', pos: { x: 440, y: 830 }, after: [11] },

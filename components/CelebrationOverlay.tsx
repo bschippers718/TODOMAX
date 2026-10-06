@@ -32,6 +32,13 @@ export function CelebrationOverlay({
   const [ending, setEnding] = useState(false);
   const minimal = settings.animationMode === 'minimal';
   const massive = celebration.tier === 'massive' && !minimal;
+  // A new celebration (or a dismiss) must not inherit the previous end card.
+  const shownId = celebration.active ? celebration.animationId : null;
+  const prevShown = useRef(shownId);
+  if (prevShown.current !== shownId) {
+    prevShown.current = shownId;
+    if (ending) setEnding(false);
+  }
 
   useEffect(() => {
     if (celebration.active && celebration.animationId) {
@@ -58,9 +65,10 @@ export function CelebrationOverlay({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (holdRef.current) clearTimeout(holdRef.current);
+      setEnding(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [celebration.active, celebration.animationId, settings.animationMode]);
+  }, [celebration.active, celebration.animationId, celebration.tier, settings.animationMode]);
 
   // A scene that does say it's done early: Massive goes to its end card,
   // anything else is over.
@@ -102,7 +110,7 @@ export function CelebrationOverlay({
           />
         </Animated.View>
       )}
-      {ending && <MassiveEndCard theme={theme} text={celebration.taskText} streak={celebration.streak} />}
+      {ending && massive && <MassiveEndCard theme={theme} text={celebration.taskText} streak={celebration.streak} />}
     </Pressable>
   );
 }

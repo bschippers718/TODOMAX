@@ -7,7 +7,7 @@ import { useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTasks } from '../hooks/useTasks';
 import { useStrikeFlow } from '../hooks/useStrikeFlow';
-import { MapCanvas, autoPlace, CARD_WIDTH } from '../components/map/MapCanvas';
+import { MapCanvas, autoPlace, CARD_WIDTH, CARD_HEIGHT } from '../components/map/MapCanvas';
 import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
 import { PressableScale } from '../components/ui/PressableScale';
@@ -48,11 +48,13 @@ export default function MapScreen() {
       if (placed.length === 0) return;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const t of placed) {
-        const w = CARD_WIDTH[t.size ?? 'm'];
+        const size = t.size ?? 'm';
+        const w = CARD_WIDTH[size];
+        const h = CARD_HEIGHT[size];
         minX = Math.min(minX, t.pos!.x);
         minY = Math.min(minY, t.pos!.y);
         maxX = Math.max(maxX, t.pos!.x + w);
-        maxY = Math.max(maxY, t.pos!.y + 90);
+        maxY = Math.max(maxY, t.pos!.y + h);
       }
       const pad = 20;
       const availW = board.current.width - pad * 2;

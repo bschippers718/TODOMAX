@@ -30,7 +30,7 @@ import { useTheme, IOS_SPRING, Theme } from '../lib/theme';
 import { LINES, lineColor, onLineColor } from '../lib/lines';
 import { Symbol } from './ui/Symbol';
 import { InkTrail, pushInkPoint } from './InkTrail';
-import { DragState, slotFor, settleOffset, ghostDx, TUCK_DX } from '../lib/dragList';
+import { DragState, slotFor, settleOffset, ghostDx, TUCK_DX, INDENT } from '../lib/dragList';
 
 // Past the threshold the card resists, like pulling against a rubber band.
 const OVERDRAG_RESISTANCE = 0.22;
@@ -66,8 +66,6 @@ const HOLD_STILL = 12;
 const SPRING_LIFT = { damping: 18, stiffness: 320, mass: 0.6 };
 const SPRING_SETTLE = { damping: 24, stiffness: 300, mass: 0.8, overshootClamping: true };
 const SPRING_SHIFT = { damping: 22, stiffness: 280, mass: 0.7 };
-// How far a tucked stop steps in from the left edge.
-export const INDENT = 22;
 
 export type DropIntent = 'move' | 'tuck' | 'untuck';
 
@@ -97,6 +95,8 @@ interface TaskItemProps {
   onLine?: (id: string, line: LineId | undefined) => void;
   /** Open stops this one comes after (texts), shown as a quiet hint. */
   upstream?: string[];
+  /** The list scrolls this row into view when the tray opens. */
+  onBeginEdit?: (index: number) => void;
 }
 
 function TaskItemInner({
@@ -116,6 +116,7 @@ function TaskItemInner({
   onSize,
   onLine,
   upstream,
+  onBeginEdit,
 }: TaskItemProps) {
   const theme = useTheme();
   const { width: SW } = useWindowDimensions();
@@ -150,6 +151,7 @@ function TaskItemInner({
   const textOpacity = useSharedValue(1);
   // 0 on the page, 1 lifted off it.
   const lift = useSharedValue(ghost ? 1 : 0);
+  const intentHint = useSharedValue(0);
   const rowRef = useAnimatedRef<Animated.View>();
 
   const [editing, setEditing] = useState(false);
@@ -196,14 +198,18 @@ function TaskItemInner({
   }, [hapticsEnabled]);
   const clearInk = useCallback(() => setInking(false), []);
 
-  const beginEdit = useCallback(() => {
-    if (!onEdit) return;
-    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setDraft(task.text);
-    editingRef.current = true;
-    setEditing(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, [onEdit, hapticsEnabled, task.text]);
+  const beginEdit = useCallback(
+    (opts?: { haptic?: boolean }) => {
+      if (!onEdit) return;
+      if ((opts?.haptic ?? true) && hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setDraft(task.text);
+      editingRef.current = true;
+      setEditing(true);
+      onBeginEdit?.(index);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [onEdit, hapticsEnabled, task.text, onBeginEdit, index],
+  );
 
   // ---- Hold to lift ---------------------------------------------------------
   const latestDrop = useRef({ onHold, onDrop, index });
@@ -236,7 +242,7 @@ function TaskItemInner({
   );
   const releaseToEdit = useCallback(() => {
     putDown();
-    beginEdit();
+    beginEdit({ haptic: false });
   }, [putDown, beginEdit]);
 
   // The list needs every row's height to know where the slots are. Layout
@@ -437,6 +443,8 @@ function TaskItemInner({
     .activateAfterLongPress(HOLD_MS)
     .onStart(() => {
       if (committed.value) return;
+      // Another card is still settling: don't steal its drop.
+      if (drag && drag.id.value !== '' && drag.id.value !== task.id) return;
       mode.value = MODE_LIFT;
       lift.value = withSpring(1, SPRING_LIFT);
       if (drag) {
@@ -451,6 +459,7 @@ function TaskItemInner({
         drag.dy.value = 0;
         drag.dx.value = 0;
         drag.id.value = task.id;
+        intentHint.value = 0;
       }
       runOnJS(fireLift)();
     })
@@ -462,6 +471,11 @@ function TaskItemInner({
       if (to !== drag.to.value) {
         drag.to.value = to;
         runOnJS(fireSlot)();
+      }
+      const hint = e.translationX > TUCK_DX ? 1 : e.translationX < -TUCK_DX ? -1 : 0;
+      if (hint !== intentHint.value) {
+        intentHint.value = hint;
+        if (hint !== 0) runOnJS(fireSlot)();
       }
     })
     .onEnd((e) => {
@@ -503,8 +517,8 @@ function TaskItemInner({
   const onCardLayout = useCallback(
     (e: LayoutChangeEvent) => {
       if (!collapsing.value) {
-        const h = e.nativeEvent.layout.height;
-        measuredHeight.value = h;
+        const h = e.nativeEvent.layout.height + (signal ? 4 : 0);
+        measuredHeight.value = e.nativeEvent.layout.height;
         cardWidth.value = e.nativeEvent.layout.width;
         lastHeight.current = h;
         if (!ghost)
@@ -515,11 +529,11 @@ function TaskItemInner({
           });
       }
     },
-    [collapsing, measuredHeight, cardWidth, drag, index, ghost],
+    [collapsing, measuredHeight, cardWidth, drag, index, ghost, signal],
   );
 
   const containerStyle = useAnimatedStyle(() => {
-    if (ghost) return { transform: [{ scale: 1.03 }] };
+    if (ghost) return { marginVertical: 0, transform: [{ scale: 1.03 }] };
     // Where the row stands while a card is held: the lifted one goes clear
     // (its ghost is drawn above the list, on the finger); the others step
     // aside as it passes.
@@ -625,6 +639,18 @@ function TaskItemInner({
         case 'edit':
           beginEdit();
           break;
+        case 'moveUp':
+          if (index > 0) latestDrop.current.onDrop?.(task.id, index - 1, 'move');
+          break;
+        case 'moveDown':
+          if (index < count - 1) latestDrop.current.onDrop?.(task.id, index + 1, 'move');
+          break;
+        case 'tuck':
+          latestDrop.current.onDrop?.(task.id, index, 'tuck');
+          break;
+        case 'untuck':
+          latestDrop.current.onDrop?.(task.id, index, 'untuck');
+          break;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -667,8 +693,9 @@ function TaskItemInner({
     size === 'xl' && styles.taskTextMassive,
   ];
 
-  // A stop that waits on another steps in under it.
-  const indented = Boolean(upstream && upstream.length > 0) && !struck;
+  // A stop that waits on another steps in under it. Keep the indent through
+  // the strike hold so the card doesn't jump sideways as it folds away.
+  const indented = Boolean(upstream && upstream.length > 0);
 
   return (
     <Animated.View ref={rowRef} style={[styles.container, indented && styles.indented, containerStyle]}>
@@ -703,6 +730,14 @@ function TaskItemInner({
             { name: 'complete', label: 'Complete' },
             { name: 'delete', label: 'Delete' },
             ...(onEdit ? [{ name: 'edit', label: 'Edit' }] : []),
+            ...(canDrag && index > 0
+              ? [
+                  { name: 'moveUp', label: 'Move up' },
+                  { name: 'tuck', label: 'Tuck under previous' },
+                ]
+              : []),
+            ...(canDrag && index < count - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
+            ...(upstream && upstream.length > 0 ? [{ name: 'untuck', label: 'Untuck' }] : []),
           ]}
           onAccessibilityAction={onAccessibilityAction}
         >
