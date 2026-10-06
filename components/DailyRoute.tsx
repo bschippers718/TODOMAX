@@ -66,7 +66,8 @@ export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
   const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks, day]);
   const colorFor = (s: Stop) => (s.kind === 'done' ? theme.green : s.kind === 'carried' ? theme.orange : 'transparent');
   // A big stop is a wider square; a small one is a little narrower.
-  const widthFor = (s: Stop, base: number) => (s.size === 'l' ? Math.round(base * 1.7) : s.size === 's' ? Math.round(base * 0.75) : base);
+  const widthFor = (s: Stop, base: number) =>
+    s.size === 'xl' ? Math.round(base * 2.2) : s.size === 'l' ? Math.round(base * 1.7) : s.size === 's' ? Math.round(base * 0.75) : base;
   const summary = summaryOf(done, carried, open);
 
   if (variant === 'inline') {

@@ -1,5 +1,5 @@
 /** How big a job it is. Bigger signs for bigger stops; the strike earns more. */
-export type TaskSize = 's' | 'm' | 'l';
+export type TaskSize = 's' | 'm' | 'l' | 'xl';
 
 /** Which route line a task sits on — colour as category. */
 export type LineId = 'red' | 'blue' | 'green' | 'orange' | 'purple' | 'yellow' | 'grey';
@@ -17,10 +17,21 @@ export interface Task {
   pos?: { x: number; y: number };
   /** Upstream stops: this task comes after these. */
   after?: string[];
+  /**
+   * The mark that struck it, so the struck card shows *your* line. Flat
+   * [x, y, w, ...]: x and y as fractions of the card's width and height,
+   * w the pen width in points.
+   */
+  ink?: number[];
 }
 
-export const TASK_SIZES: TaskSize[] = ['s', 'm', 'l'];
-export const TASK_SIZE_LABEL: Record<TaskSize, string> = { s: 'Small', m: 'Medium', l: 'Big' };
+export const TASK_SIZES: TaskSize[] = ['s', 'm', 'l', 'xl'];
+export const TASK_SIZE_LABEL: Record<TaskSize, string> = { s: 'Small', m: 'Medium', l: 'Big', xl: 'Massive' };
+
+/** Big and Massive share the display treatment; Massive goes further. */
+export function isBig(size: TaskSize): boolean {
+  return size === 'l' || size === 'xl';
+}
 
 export function taskSize(t: Pick<Task, 'size'>): TaskSize {
   return t.size ?? 'm';
@@ -134,9 +145,53 @@ export const ANIMATION_MIN_STREAK: Partial<Record<AnimationId, number>> = {
   hydrantBlast: 2,
 };
 
-export function isAnimationEligible(id: AnimationId, streak: number): boolean {
-  return streak >= (ANIMATION_MIN_STREAK[id] ?? 0);
+/**
+ * How big the moment is. Decided by the size of the stop, so a small errand
+ * gets a glimpse and a massive one gets the whole show.
+ *
+ *   glimpse  — a ~1s cut of the scene, no banner hold
+ *   scene    — the full scene
+ *   feature  — the full scene; the signature pieces live here and up
+ *   massive  — feature, then a held end card with the stop's name
+ */
+export type CelebrationTier = 'glimpse' | 'scene' | 'feature' | 'massive';
+
+export const TIER_RANK: Record<CelebrationTier, number> = { glimpse: 0, scene: 1, feature: 2, massive: 3 };
+
+export function tierForSize(size: TaskSize): CelebrationTier {
+  switch (size) {
+    case 's':
+      return 'glimpse';
+    case 'm':
+      return 'scene';
+    case 'l':
+      return 'feature';
+    case 'xl':
+      return 'massive';
+  }
 }
+
+/**
+ * The long, elaborate scenes wait for a Big stop. A Medium draws from the
+ * rest, so the difference between sizes is one you can see. Soft floor: if a
+ * pack has nothing else, the shuffle still plays what it has.
+ */
+export const ANIMATION_MIN_TIER: Partial<Record<AnimationId, CelebrationTier>> = {
+  errandComplete: 'feature',
+  routeDrawn: 'feature',
+  hydrantBlast: 'feature',
+  touchdown: 'feature',
+  trophyRaise: 'feature',
+  levelClear: 'feature',
+};
+
+export function isAnimationEligible(id: AnimationId, streak: number, tier: CelebrationTier = 'feature'): boolean {
+  if (streak < (ANIMATION_MIN_STREAK[id] ?? 0)) return false;
+  return TIER_RANK[tier] >= TIER_RANK[ANIMATION_MIN_TIER[id] ?? 'glimpse'];
+}
+
+/** How long the Massive end card holds after the scene. */
+export const MASSIVE_HOLD_MS = 1600;
 
 export interface CelebrationAnimationProps {
   onComplete: () => void;

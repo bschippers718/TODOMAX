@@ -31,7 +31,7 @@ const SEEDS: Seed[] = [
   { text: "Plan Dad's birthday dinner", line: 'orange', pos: { x: 410, y: 420 } },
   { text: 'Write the Signal style guide intro', size: 'l', line: 'red', pos: { x: 200, y: 560 }, after: [5, 6] },
   { text: 'Email the accountant about the K-1', line: 'grey', pos: { x: 20, y: 700 }, ageH: 26 },
-  { text: 'Rough cut of the trailer by Sunday', size: 'l', line: 'purple', pos: { x: 250, y: 700 } },
+  { text: 'Rough cut of the trailer by Sunday', size: 'xl', line: 'purple', pos: { x: 250, y: 700 } },
   { text: 'Order new running shoes', size: 's', line: 'green', pos: { x: 510, y: 690 } },
   { text: 'Prep questions for the Tuesday interview', line: 'blue', pos: { x: 30, y: 840 }, after: [0] },
   { text: 'Cancel the unused streaming sub', size: 's', line: 'grey', pos: { x: 270, y: 850 } },

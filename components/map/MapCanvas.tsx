@@ -12,15 +12,15 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { Task, TaskSize, taskSize } from '../../lib/types';
+import { Task, TaskSize, taskSize, isBig } from '../../lib/types';
 import { Theme, IOS_SPRING_SNAPPY } from '../../lib/theme';
-import { lineColor } from '../../lib/lines';
+import { lineColor, onLineColor } from '../../lib/lines';
 
 export type Point = { x: number; y: number };
 type Positions = Record<string, Point>;
 type Dims = Record<string, { w: number; h: number }>;
 
-export const CARD_WIDTH: Record<TaskSize, number> = { s: 150, m: 190, l: 240 };
+export const CARD_WIDTH: Record<TaskSize, number> = { s: 150, m: 190, l: 240, xl: 290 };
 const GRID = { cols: 2, cellW: 212, cellH: 118, originX: 24, originY: 24 };
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
@@ -414,8 +414,12 @@ const MapCard = memo(function MapCard({
     return { shadowOffset: { width: d, height: d } };
   });
 
+  // A line paints the whole card, same as on the list: the stop *is* its line.
+  const paint = task.line ? lineColor(task.line, theme) : null;
+  const onPaint = task.line ? onLineColor(task.line, theme) : null;
   const border = selected ? theme.blue : linking ? theme.textTertiary : theme.cardBorder;
-  const dot = task.line ? lineColor(task.line, theme) : signal ? theme.text : theme.textTertiary;
+  const dot = paint ? onPaint! : signal ? theme.text : theme.textTertiary;
+  const ink = paint ? onPaint! : theme.text;
 
   return (
     <GestureDetector gesture={gesture}>
@@ -434,13 +438,14 @@ const MapCard = memo(function MapCard({
           shadow,
           {
             width: CARD_WIDTH[size],
-            backgroundColor: theme.surface,
+            backgroundColor: paint ?? theme.surface,
             borderColor: border,
             borderWidth: selected ? Math.max(2.5, theme.borderWidth) : theme.borderWidth,
             borderRadius: theme.radiusCard,
           },
           size === 's' && styles.cardS,
-          size === 'l' && styles.cardL,
+          isBig(size) && styles.cardL,
+          size === 'xl' && styles.cardXL,
           placement,
         ]}
         accessible
@@ -449,16 +454,17 @@ const MapCard = memo(function MapCard({
         accessibilityHint="Double tap to strike. Tap to connect to another stop. Hold and drag to move."
       >
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.green, borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) }, flash]} />
-        <View style={[styles.dot, { backgroundColor: dot, borderRadius: signal ? 2 : 5 }, size === 'l' && styles.dotL]} />
+        <View style={[styles.dot, { backgroundColor: dot, borderRadius: signal ? 2 : 5 }, isBig(size) && styles.dotL]} />
         <Text
           style={[
             styles.text,
-            size === 'l' ? (signal ? theme.fontDisplay : styles.textBigClassic) : theme.fontTask,
-            { color: theme.text },
+            isBig(size) ? (signal ? theme.fontDisplay : styles.textBigClassic) : theme.fontTask,
+            { color: ink },
             size === 's' && styles.textS,
-            size === 'l' && styles.textL,
+            isBig(size) && styles.textL,
+            size === 'xl' && styles.textXL,
           ]}
-          numberOfLines={size === 'l' ? 4 : 3}
+          numberOfLines={isBig(size) ? 4 : 3}
           allowFontScaling={false}
         >
           {task.text}
@@ -514,6 +520,11 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     gap: 12,
   },
+  cardXL: {
+    paddingHorizontal: 22,
+    paddingVertical: 22,
+    gap: 14,
+  },
   dot: {
     width: 10,
     height: 10,
@@ -540,5 +551,10 @@ const styles = StyleSheet.create({
   },
   textBigClassic: {
     fontWeight: '800',
+  },
+  textXL: {
+    fontSize: 25,
+    lineHeight: 29,
+    letterSpacing: -0.8,
   },
 });
