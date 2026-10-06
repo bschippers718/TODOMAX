@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Redirect, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -10,7 +11,9 @@ import { useSettings } from '../hooks/useSettings';
 import { useStrikeFlow } from '../hooks/useStrikeFlow';
 import { useDayTick } from '../hooks/useDayTick';
 import { buildSampleTasks } from '../lib/sampleData';
-import { TaskItem } from '../components/TaskItem';
+import { TaskItem, DropIntent } from '../components/TaskItem';
+import { StruckCard } from '../components/StruckCard';
+import { useDragState, ghostDx, DragState } from '../lib/dragList';
 import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
 import { AppBackground } from '../components/AppBackground';
@@ -18,8 +21,27 @@ import { DailyRoute, buildRoute, todayLabel } from '../components/DailyRoute';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { useTheme, loudType } from '../lib/theme';
-import { Task, openUpstream } from '../lib/types';
+import { Task, Settings, openUpstream } from '../lib/types';
 import { animateNextLayout } from '../lib/nativeLayout';
+
+const noop = () => {};
+
+// The held card, drawn above the list where the real row sat, riding the
+// finger. The row itself goes clear underneath.
+function GhostCard({ drag, task, index, settings }: { drag: DragState; task: Task; index: number; settings: Settings }) {
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: drag.ghostX.value,
+    top: drag.ghostY.value,
+    width: drag.ghostW.value,
+    transform: [{ translateY: drag.dy.value }, { translateX: ghostDx(drag.dx.value) }],
+  }));
+  return (
+    <Animated.View style={style}>
+      <TaskItem ghost task={task} index={index} settings={settings} onComplete={noop} onDelete={noop} />
+    </Animated.View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -32,11 +54,15 @@ export default function HomeScreen() {
     streak,
     loaded,
     addTask,
+    uncompleteTask,
     deleteTask,
     restoreTask,
     editTask,
     setTaskSize,
     setTaskLine,
+    reorderTask,
+    linkAfter,
+    clearAfter,
     clearCompleted,
     replaceTasks,
   } = useTasks();
@@ -59,13 +85,34 @@ export default function HomeScreen() {
   const day = useDayTick();
 
   const handleComplete = useCallback(
-    (id: string, size: Parameters<typeof onComplete>[1]) => {
+    (id: string, size: Parameters<typeof onComplete>[1], ink?: number[]) => {
       // The row has already collapsed; this covers the footer/empty-state swap.
       animateNextLayout(reduceMotion);
-      onComplete(id, size);
+      onComplete(id, size, ink);
     },
     [onComplete, reduceMotion],
   );
+
+  // A struck stop goes back on the route with a tap. No confirm; it's a list.
+  const handleRestore = useCallback(
+    (id: string) => {
+      animateNextLayout(reduceMotion);
+      uncompleteTask(id);
+    },
+    [uncompleteTask, reduceMotion],
+  );
+
+  // Today's strikes stay in view, newest at the bottom, so the day reads top to
+  // bottom: what's left, then what you did. Older ones fold behind the count.
+  const { todayStruck, olderStruck } = useMemo(() => {
+    const dayStart = new Date().setHours(0, 0, 0, 0);
+    const sorted = [...completedTasks].sort((a, b) => (a.completedAt ?? 0) - (b.completedAt ?? 0));
+    return {
+      todayStruck: sorted.filter((t) => (t.completedAt ?? 0) >= dayStart),
+      olderStruck: sorted.filter((t) => (t.completedAt ?? 0) < dayStart).reverse(),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedTasks, day]);
 
   const toggleCompleted = useCallback(() => {
     if (settings.hapticsEnabled) Haptics.selectionAsync();
@@ -122,11 +169,55 @@ export default function HomeScreen() {
     [tasks],
   );
 
+  // Hold a card to lift it. Where it lands is the new order; pushed to the
+  // right on the way down, it tucks under the stop above it.
+  const drag = useDragState();
+  const [heldId, setHeldId] = useState('');
+  const handleHold = useCallback((id: string | null) => setHeldId(id ?? ''), []);
+  const heldIndex = heldId ? activeTasks.findIndex((t) => t.id === heldId) : -1;
+  const heldTask = heldIndex >= 0 ? activeTasks[heldIndex] : null;
+  const handleDrop = useCallback(
+    (id: string, to: number, intent: DropIntent) => {
+      reorderTask(id, to);
+      if (intent === 'untuck') {
+        clearAfter(id);
+        return;
+      }
+      if (intent !== 'tuck') return;
+      // The store has already moved; work out the new neighbour above.
+      const open = tasksRef.current.filter((t) => !t.completed);
+      const from = open.findIndex((t) => t.id === id);
+      if (from < 0) return;
+      const next = [...open];
+      const [moved] = next.splice(from, 1);
+      next.splice(Math.max(0, Math.min(to, next.length)), 0, moved);
+      const above = next[next.indexOf(moved) - 1];
+      if (!above) return;
+      const r = linkAfter(id, above.id);
+      if (r === 'refused') {
+        showToast({
+          title: 'Kept apart',
+          subtitle: `${above.text.length > 28 ? above.text.slice(0, 28) + '…' : above.text} already waits on this one`,
+          icon: 'arrow.triangle.2.circlepath',
+          tint: theme.textSecondary,
+          durationMs: 2600,
+        });
+      } else if (r === 'linked' && settings.hapticsEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+    [reorderTask, clearAfter, linkAfter, showToast, theme.textSecondary, settings.hapticsEnabled],
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: Task; index: number }) => (
       <TaskItem
         task={item}
         index={index}
+        count={activeTasks.length}
+        drag={drag}
+        onHold={handleHold}
+        onDrop={handleDrop}
         settings={settings}
         reduceMotion={reduceMotion}
         onStrike={onStrike}
@@ -138,7 +229,21 @@ export default function HomeScreen() {
         upstream={upstreamFor(item)}
       />
     ),
-    [settings, reduceMotion, onStrike, handleComplete, handleDelete, editTask, setTaskSize, setTaskLine, upstreamFor],
+    [
+      activeTasks.length,
+      drag,
+      handleHold,
+      handleDrop,
+      settings,
+      reduceMotion,
+      onStrike,
+      handleComplete,
+      handleDelete,
+      editTask,
+      setTaskSize,
+      setTaskLine,
+      upstreamFor,
+    ],
   );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,7 +435,18 @@ export default function HomeScreen() {
     </View>
   );
 
+  const todayCards = todayStruck.length > 0 && (
+    <View style={styles.todayStruck}>
+      {todayStruck.map((task) => (
+        <StruckCard key={task.id} task={task} onRestore={handleRestore} hapticsEnabled={settings.hapticsEnabled} />
+      ))}
+    </View>
+  );
+
   const classicStruck = (
+    <View>
+    {todayCards}
+    {(olderStruck.length > 0 || todayStruck.length === 0) && (
     <View style={[styles.completedSection, cardChrome]}>
       <PressableScale
         style={styles.completedHeader}
@@ -341,13 +457,13 @@ export default function HomeScreen() {
         accessibilityState={{ expanded: showCompleted }}
       >
         <Text style={[styles.completedTitle, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.3}>
-          Completed ({completedTasks.length})
+          {olderStruck.length > 0 ? `Earlier (${olderStruck.length})` : `Completed (${completedTasks.length})`}
         </Text>
         <Symbol name="chevron.right" size={14} color={theme.textTertiary} weight="bold" style={showCompleted ? styles.chevronOpen : undefined} />
       </PressableScale>
       {showCompleted && (
         <View>
-          {completedTasks.map((task) => (
+          {olderStruck.map((task) => (
             <View
               key={task.id}
               style={[styles.completedItem, { backgroundColor: theme.surface, borderColor: theme.separator, borderWidth: 1, borderRadius: theme.radiusCard }]}
@@ -370,11 +486,15 @@ export default function HomeScreen() {
         </View>
       )}
     </View>
+    )}
+    </View>
   );
 
   // A grey line of text that opens in place. No card, no stamps.
   const signalStruck = (
-    <View style={styles.struckSection}>
+    <View>
+    {todayCards}
+    <View style={[styles.struckSection, todayStruck.length > 0 && styles.struckSectionTight]}>
       <PressableScale
         style={styles.struckLine}
         onPress={toggleCompleted}
@@ -385,14 +505,14 @@ export default function HomeScreen() {
         accessibilityState={{ expanded: showCompleted }}
       >
         <Text style={[styles.struckText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
-          {completedTasks.length} struck
+          {olderStruck.length > 0 ? `${olderStruck.length} struck earlier` : `${completedTasks.length} struck`}
           {stats.earned > 0 ? `  ·  ${stats.earned} collected` : ''}
         </Text>
         <Symbol name="chevron.right" size={11} color={theme.textTertiary} weight="bold" style={showCompleted ? styles.chevronOpen : undefined} />
       </PressableScale>
       {showCompleted && (
         <View>
-          {completedTasks.map((task) => (
+          {olderStruck.map((task) => (
             <View key={task.id} style={[styles.struckItem, { borderTopColor: theme.separator }]}>
               <View style={[styles.struckDot, { backgroundColor: theme.green }]} />
               <Text style={[styles.struckItemText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3} numberOfLines={2}>
@@ -414,6 +534,7 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+    </View>
     </View>
   );
 
@@ -449,6 +570,12 @@ export default function HomeScreen() {
 
         <AddTaskInput onAdd={handleAdd} hapticsEnabled={settings.hapticsEnabled} />
       </KeyboardAvoidingView>
+
+      {heldTask && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <GhostCard drag={drag} task={heldTask} index={heldIndex} settings={settings} />
+        </View>
+      )}
 
       {toast}
       <CelebrationOverlay celebration={celebration} settings={celebrationSettings} onDismiss={dismissCelebration} />
@@ -676,10 +803,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Today's struck cards sit right under the route, a little apart from it.
+  todayStruck: {
+    marginTop: 14,
+  },
   // Signal struck line
   struckSection: {
     marginTop: 22,
     paddingHorizontal: 4,
+  },
+  struckSectionTight: {
+    marginTop: 6,
   },
   struckLine: {
     flexDirection: 'row',

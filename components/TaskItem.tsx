@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, memo } from 'react';
+import { useRef, useCallback, useEffect, useState, memo } from 'react';
 import {
   Text,
   View,
@@ -13,6 +13,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedReaction,
+  useAnimatedRef,
+  measure,
   withTiming,
   withDelay,
   withSpring,
@@ -23,11 +25,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { Task, Settings, TaskSize, LineId, TASK_SIZES, TASK_SIZE_LABEL, taskSize } from '../lib/types';
+import { Task, Settings, TaskSize, LineId, TASK_SIZES, TASK_SIZE_LABEL, taskSize, isBig } from '../lib/types';
 import { useTheme, IOS_SPRING, Theme } from '../lib/theme';
 import { LINES, lineColor, onLineColor } from '../lib/lines';
 import { Symbol } from './ui/Symbol';
 import { InkTrail, pushInkPoint } from './InkTrail';
+import { DragState, slotFor, settleOffset, ghostDx, TUCK_DX } from '../lib/dragList';
 
 // Past the threshold the card resists, like pulling against a rubber band.
 const OVERDRAG_RESISTANCE = 0.22;
@@ -54,17 +57,40 @@ const PEN_MAX = 1.2;
 const MODE_NONE = 0;
 const MODE_INK = 1;
 const MODE_SLIDE = 2;
+const MODE_LIFT = 3;
+
+// Hold still this long and the card lifts off the page.
+const HOLD_MS = 420;
+// Under this much travel a hold-and-release is a tap-and-hold: open the tray.
+const HOLD_STILL = 12;
+const SPRING_LIFT = { damping: 18, stiffness: 320, mass: 0.6 };
+const SPRING_SETTLE = { damping: 24, stiffness: 300, mass: 0.8, overshootClamping: true };
+const SPRING_SHIFT = { damping: 22, stiffness: 280, mass: 0.7 };
+// How far a tucked stop steps in from the left edge.
+export const INDENT = 22;
+
+export type DropIntent = 'move' | 'tuck' | 'untuck';
 
 interface TaskItemProps {
   task: Task;
   settings: Settings;
   /** Position in the list; Signal shows it as a stop number. */
   index?: number;
+  /** Open stops in the list; bounds the drag. */
+  count?: number;
+  /** Shared drag bookkeeping; without it, hold just opens the tray. */
+  drag?: DragState;
+  /** Card lifted (id) or put down (null). The list raises the held cell. */
+  onHold?: (id: string | null) => void;
+  /** Card released in slot `to`, pushed right (tuck) or left (untuck) or neither. */
+  onDrop?: (id: string, to: number, intent: DropIntent) => void;
+  /** The copy drawn above the list while the real row is held. Looks lifted, does nothing. */
+  ghost?: boolean;
   reduceMotion?: boolean;
   /** Fired the instant the mark lands (sound/haptics belong here). */
   onStrike?: (id: string) => void;
   /** Fired after the card has fully collapsed and can be removed from the list. */
-  onComplete: (id: string, size: TaskSize) => void;
+  onComplete: (id: string, size: TaskSize, ink?: number[]) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, text: string) => void;
   onSize?: (id: string, size: TaskSize) => void;
@@ -77,6 +103,11 @@ function TaskItemInner({
   task,
   settings,
   index = 0,
+  count = 1,
+  drag,
+  onHold,
+  onDrop,
+  ghost = false,
   reduceMotion = false,
   onStrike,
   onComplete,
@@ -117,10 +148,14 @@ function TaskItemInner({
   const collapsing = useSharedValue(false);
   const cardOpacity = useSharedValue(1);
   const textOpacity = useSharedValue(1);
+  // 0 on the page, 1 lifted off it.
+  const lift = useSharedValue(ghost ? 1 : 0);
+  const rowRef = useAnimatedRef<Animated.View>();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.text);
   const size = taskSize(task);
+  const big = isBig(size);
   const line = task.line;
   const inputRef = useRef<TextInput>(null);
 
@@ -131,7 +166,12 @@ function TaskItemInner({
   const latest = useRef({ onComplete, onDelete, onStrike, size, hapticsEnabled });
   latest.current = { onComplete, onDelete, onStrike, size, hapticsEnabled };
 
-  const fireComplete = useCallback(() => latest.current.onComplete(task.id, latest.current.size), [task.id]);
+  // The mark, normalised to the card, so the struck card can draw it back.
+  const inkSnapshot = useRef<number[] | undefined>(undefined);
+  const keepInk = useCallback((ink: number[]) => {
+    inkSnapshot.current = ink;
+  }, []);
+  const fireComplete = useCallback(() => latest.current.onComplete(task.id, latest.current.size, inkSnapshot.current), [task.id]);
   const fireDelete = useCallback(() => latest.current.onDelete(task.id), [task.id]);
   const fireStrike = useCallback(() => {
     // The "it's done" moment is a success notification, not a thud.
@@ -165,6 +205,53 @@ function TaskItemInner({
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [onEdit, hapticsEnabled, task.text]);
 
+  // ---- Hold to lift ---------------------------------------------------------
+  const latestDrop = useRef({ onHold, onDrop, index });
+  latestDrop.current = { onHold, onDrop, index };
+  const fireLift = useCallback(() => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    latestDrop.current.onHold?.(task.id);
+  }, [hapticsEnabled, task.id]);
+  const fireSlot = useCallback(() => {
+    if (hapticsEnabled) Haptics.selectionAsync();
+  }, [hapticsEnabled]);
+  // Put the shared state back and tell the list the card is down. Called in
+  // the same tick as the reorder so the new order and the zeroed transforms
+  // land in one frame.
+  const putDown = useCallback(() => {
+    if (!drag) return;
+    drag.id.value = '';
+    drag.dy.value = 0;
+    drag.dx.value = 0;
+    drag.from.value = 0;
+    drag.to.value = 0;
+    latestDrop.current.onHold?.(null);
+  }, [drag]);
+  const dropAt = useCallback(
+    (to: number, intent: DropIntent) => {
+      latestDrop.current.onDrop?.(task.id, to, intent);
+      putDown();
+    },
+    [task.id, putDown],
+  );
+  const releaseToEdit = useCallback(() => {
+    putDown();
+    beginEdit();
+  }, [putDown, beginEdit]);
+
+  // The list needs every row's height to know where the slots are. Layout
+  // only fires on a size change, so re-register when the index moves too.
+  const lastHeight = useRef(0);
+  useEffect(() => {
+    if (!drag || ghost || !lastHeight.current) return;
+    const h = lastHeight.current;
+    drag.heights.modify((v) => {
+      'worklet';
+      v[index] = h;
+      return v;
+    });
+  }, [drag, index, ghost]);
+
   const editingRef = useRef(false);
   const commitEdit = useCallback(() => {
     // Return and the blur it causes both land here; commit once.
@@ -191,6 +278,15 @@ function TaskItemInner({
   // recede, and after a beat the card folds out of the list.
   const land = () => {
     'worklet';
+    const cw = cardWidth.value || 1;
+    const ch = measuredHeight.value || 1;
+    const p = inkPoints.value;
+    const n = Math.floor(inkCount.value);
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      out.push(Math.round((p[i * 3] / cw) * 1000) / 1000, Math.round((p[i * 3 + 1] / ch) * 1000) / 1000, Math.round(p[i * 3 + 2] * 10) / 10);
+    }
+    runOnJS(keepInk)(out);
     runOnJS(fireStrike)();
     textOpacity.value = withTiming(0.3, { duration: 220 });
     collapseOut(HOLD_AFTER_STRIKE, fireComplete);
@@ -260,7 +356,7 @@ function TaskItemInner({
   const inset = theme.borderWidth;
 
   const panGesture = Gesture.Pan()
-    .enabled(!editing)
+    .enabled(!editing && !ghost)
     .maxPointers(1)
     .activeOffsetX([-10, 10])
     // A scribble rarely starts dead horizontal; give it a little slack
@@ -326,39 +422,134 @@ function TaskItemInner({
         if (mode.value === MODE_INK) liftInk();
         else if (mode.value === MODE_SLIDE) translateX.value = withSpring(0, SPRING_BACK);
       }
-      mode.value = MODE_NONE;
+      // The hold winning the race cancels this one; leave its mode alone.
+      if (mode.value !== MODE_LIFT) mode.value = MODE_NONE;
     });
 
-  const longPress = Gesture.LongPress()
-    .enabled(!editing && Boolean(onEdit))
-    .minDuration(420)
-    .maxDistance(12)
+  // Hold still and the card lifts. Move it and the list makes room; push it
+  // to the right and it tucks under the stop above; let go without moving and
+  // the tray opens. Any movement before the hold fires hands the touch to the
+  // pen or the scroll.
+  const canDrag = Boolean(drag && onDrop);
+  const holdPan = Gesture.Pan()
+    .enabled(!editing && !ghost && (canDrag || Boolean(onEdit)))
+    .maxPointers(1)
+    .activateAfterLongPress(HOLD_MS)
     .onStart(() => {
       if (committed.value) return;
-      runOnJS(beginEdit)();
+      mode.value = MODE_LIFT;
+      lift.value = withSpring(1, SPRING_LIFT);
+      if (drag) {
+        const m = measure(rowRef);
+        if (m) {
+          drag.ghostX.value = m.pageX;
+          drag.ghostY.value = m.pageY;
+          drag.ghostW.value = m.width;
+        }
+        drag.from.value = index;
+        drag.to.value = index;
+        drag.dy.value = 0;
+        drag.dx.value = 0;
+        drag.id.value = task.id;
+      }
+      runOnJS(fireLift)();
+    })
+    .onUpdate((e) => {
+      if (mode.value !== MODE_LIFT || !drag || !canDrag) return;
+      drag.dy.value = e.translationY;
+      drag.dx.value = e.translationX;
+      const to = slotFor(drag.heights.value, index, e.translationY, count);
+      if (to !== drag.to.value) {
+        drag.to.value = to;
+        runOnJS(fireSlot)();
+      }
+    })
+    .onEnd((e) => {
+      if (mode.value !== MODE_LIFT) return;
+      lift.value = withSpring(0, SPRING_LIFT);
+      const still = Math.abs(e.translationX) < HOLD_STILL && Math.abs(e.translationY) < HOLD_STILL;
+      if (!drag || !canDrag || still) {
+        if (drag) {
+          drag.dx.value = withSpring(0, SPRING_SETTLE);
+          drag.dy.value = withSpring(0, SPRING_SETTLE);
+        }
+        runOnJS(releaseToEdit)();
+        return;
+      }
+      const to = drag.to.value;
+      const intent: DropIntent = e.translationX > TUCK_DX ? 'tuck' : e.translationX < -TUCK_DX ? 'untuck' : 'move';
+      const target = settleOffset(drag.heights.value, index, to);
+      drag.dx.value = withTiming(0, { duration: 140 });
+      drag.dy.value = withSpring(target, SPRING_SETTLE, (finished) => {
+        if (finished) runOnJS(dropAt)(to, intent);
+      });
+    })
+    .onFinalize((_e, success) => {
+      if (!success && mode.value === MODE_LIFT) {
+        lift.value = withSpring(0, SPRING_LIFT);
+        if (drag) {
+          drag.to.value = index;
+          drag.dx.value = withSpring(0, SPRING_SETTLE);
+          drag.dy.value = withSpring(0, SPRING_SETTLE, (finished) => {
+            if (finished) runOnJS(putDown)();
+          });
+        }
+      }
+      if (mode.value === MODE_LIFT) mode.value = MODE_NONE;
     });
 
-  const gesture = Gesture.Race(longPress, panGesture);
+  const gesture = Gesture.Race(holdPan, panGesture);
 
   const onCardLayout = useCallback(
     (e: LayoutChangeEvent) => {
       if (!collapsing.value) {
-        measuredHeight.value = e.nativeEvent.layout.height;
+        const h = e.nativeEvent.layout.height;
+        measuredHeight.value = h;
         cardWidth.value = e.nativeEvent.layout.width;
+        lastHeight.current = h;
+        if (!ghost)
+          drag?.heights.modify((v) => {
+            'worklet';
+            v[index] = h;
+            return v;
+          });
       }
     },
-    [collapsing, measuredHeight, cardWidth],
+    [collapsing, measuredHeight, cardWidth, drag, index, ghost],
   );
 
   const containerStyle = useAnimatedStyle(() => {
+    if (ghost) return { transform: [{ scale: 1.03 }] };
+    // Where the row stands while a card is held: the lifted one goes clear
+    // (its ghost is drawn above the list, on the finger); the others step
+    // aside as it passes.
+    let dy = 0;
+    let opacity = cardOpacity.value;
+    const held = drag ? drag.id.value : '';
+    if (drag && held !== '') {
+      if (held === task.id) {
+        // A beat, so the ghost is on screen before this one goes.
+        opacity = withTiming(0, { duration: 120 });
+      } else {
+        const from = drag.from.value;
+        const to = drag.to.value;
+        const gap = (drag.heights.value[from] ?? 56) + CARD_MARGIN * 2;
+        let shift = 0;
+        if (from < index && index <= to) shift = -gap;
+        else if (to <= index && index < from) shift = gap;
+        dy = withSpring(shift, SPRING_SHIFT);
+      }
+    }
+    const transform = [{ translateY: dy }, { scale: 1 + lift.value * 0.03 }];
     if (!collapsing.value) {
-      return { opacity: cardOpacity.value, marginVertical: CARD_MARGIN };
+      return { opacity, marginVertical: CARD_MARGIN, transform };
     }
     const k = 1 - collapse.value;
     return {
-      opacity: cardOpacity.value,
+      opacity,
       height: Math.max(0, measuredHeight.value * k),
       marginVertical: CARD_MARGIN * k,
+      transform,
     };
   });
 
@@ -405,6 +596,17 @@ function TaskItemInner({
       if (f) land();
     });
   };
+
+  // The bullet is a button. Tap it and the pen draws the line for you: the
+  // same mark, the same moment, one finger less. (VoiceOver's "Complete" does
+  // the same thing.)
+  const strikeFromBullet = useCallback(() => {
+    if (committed.value || editing) return;
+    committed.value = true;
+    firePenDown();
+    strikeWithoutFinger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, firePenDown]);
 
   const onAccessibilityAction = useCallback(
     (e: AccessibilityActionEvent) => {
@@ -457,15 +659,19 @@ function TaskItemInner({
   const inkColor = painted ? onPaint! : theme.accent;
   const textStyle = [
     styles.taskText,
-    size === 'l' ? (signal ? theme.fontDisplay : styles.taskTextBigClassic) : theme.fontTask,
+    big ? (signal ? theme.fontDisplay : styles.taskTextBigClassic) : theme.fontTask,
     { color: painted ? onPaint! : theme.text },
     signal && styles.taskTextSignal,
     size === 's' && styles.taskTextSmall,
-    size === 'l' && styles.taskTextBig,
+    big && styles.taskTextBig,
+    size === 'xl' && styles.taskTextMassive,
   ];
 
+  // A stop that waits on another steps in under it.
+  const indented = Boolean(upstream && upstream.length > 0) && !struck;
+
   return (
-    <Animated.View style={[styles.container, containerStyle]}>
+    <Animated.View ref={rowRef} style={[styles.container, indented && styles.indented, containerStyle]}>
       <Animated.View style={[styles.bgDelete, radius, signal && styles.bgSignal, { backgroundColor: theme.accent }, deleteBgStyle]}>
         <Animated.View style={trashStyle}>
           <Symbol name="trash.fill" size={20} color="#fff" weight="semibold" />
@@ -507,17 +713,30 @@ function TaskItemInner({
               { borderRadius: Math.max(0, theme.radiusCard - theme.borderWidth) },
               signal ? styles.cardInnerSignal : styles.cardInnerClassic,
               size === 's' && styles.cardInnerSmall,
-              size === 'l' && styles.cardInnerBig,
+              big && styles.cardInnerBig,
+              size === 'xl' && styles.cardInnerMassive,
             ]}
           >
             {/* The bullet is a row sibling of the text, so it centres on the
                 text block whatever height the card ends up. */}
             {signal && (
-              <View style={[styles.bullet, size === 'l' && styles.bulletBig, { backgroundColor: bulletColor }]}>
-                <Text style={[styles.bulletText, size === 'l' && styles.bulletTextBig, { color: bulletInk }]} allowFontScaling={false}>
+              <Pressable
+                onPress={strikeFromBullet}
+                disabled={editing || struck}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Strike stop ${index + 1}`}
+                style={({ pressed }) => [
+                  styles.bullet,
+                  big && styles.bulletBig,
+                  size === 'xl' && styles.bulletMassive,
+                  { backgroundColor: bulletColor, transform: [{ scale: pressed ? 0.88 : 1 }] },
+                ]}
+              >
+                <Text style={[styles.bulletText, big && styles.bulletTextBig, { color: bulletInk }]} allowFontScaling={false}>
                   {index + 1}
                 </Text>
-              </View>
+              </Pressable>
             )}
 
             {editing ? (
@@ -547,7 +766,7 @@ function TaskItemInner({
               </View>
             ) : (
               <Animated.View style={[styles.body, textAnimStyle]}>
-                <Text style={textStyle} numberOfLines={size === 'l' ? 4 : 3} maxFontSizeMultiplier={1.3}>
+                <Text style={textStyle} numberOfLines={big ? 4 : 3} maxFontSizeMultiplier={1.3}>
                   {task.text}
                 </Text>
                 {upstream && upstream.length > 0 && !struck && (
@@ -613,6 +832,7 @@ function EditTray({
                   styles.sizeChip,
                   s === 's' && styles.sizeChipS,
                   s === 'l' && styles.sizeChipL,
+                  s === 'xl' && styles.sizeChipXL,
                   {
                     borderColor: on ? theme.text : theme.textTertiary,
                     backgroundColor: on ? theme.text : 'transparent',
@@ -675,6 +895,9 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     marginVertical: CARD_MARGIN,
+  },
+  indented: {
+    marginLeft: INDENT,
   },
   bgDelete: {
     ...StyleSheet.absoluteFillObject,
@@ -754,12 +977,22 @@ const styles = StyleSheet.create({
   taskTextBigClassic: {
     fontWeight: '800',
   },
+  // Massive: the biggest sign on the platform.
+  taskTextMassive: {
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -0.9,
+  },
   taskInput: {
     paddingVertical: 0,
     margin: 0,
   },
   cardInnerSmall: {
     paddingVertical: 9,
+  },
+  cardInnerMassive: {
+    minHeight: 128,
+    paddingVertical: 30,
   },
   cardInnerBig: {
     minHeight: 100,
@@ -771,6 +1004,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginRight: 12,
     marginLeft: -2,
+  },
+  bulletMassive: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginRight: 14,
+    marginLeft: -4,
   },
   bulletTextBig: {
     fontSize: 15,
@@ -808,6 +1048,10 @@ const styles = StyleSheet.create({
   sizeChipL: {
     width: 32,
     height: 32,
+  },
+  sizeChipXL: {
+    width: 38,
+    height: 38,
   },
   sizeChipText: {
     fontSize: 9,
