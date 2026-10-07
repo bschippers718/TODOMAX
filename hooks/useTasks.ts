@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskSize, LineId, generateId } from '../lib/types';
+import { applyListDrop, ListDropIntent, ListDropResult } from '../lib/stack';
 import { loadJSON, saveJSON, KEYS } from '../lib/storage';
 
 /**
@@ -139,6 +140,16 @@ export function reorderTask(id: string, to: number) {
   });
 }
 
+/**
+ * Reorder an open stop and, when tucking, hang it off the original at the
+ * top of that stack — along with every other supporter already there.
+ */
+export function dropInList(id: string, to: number, intent: ListDropIntent): ListDropResult {
+  const { tasks, result } = applyListDrop(state.tasks, id, to, intent);
+  if (tasks !== state.tasks) setTasks(() => tasks);
+  return result;
+}
+
 /** `id` now comes after `upstreamId` (list drag: tucked under the stop above). */
 export function linkAfter(id: string, upstreamId: string): 'linked' | 'refused' | 'kept' {
   const t = state.tasks.find((x) => x.id === id);
@@ -254,6 +265,7 @@ export function useTasks() {
       setTaskSize,
       setTaskLine,
       reorderTask,
+      dropInList,
       linkAfter,
       clearAfter,
       moveTask,

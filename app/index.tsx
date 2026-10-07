@@ -60,9 +60,7 @@ export default function HomeScreen() {
     editTask,
     setTaskSize,
     setTaskLine,
-    reorderTask,
-    linkAfter,
-    clearAfter,
+    dropInList,
     clearCompleted,
     replaceTasks,
   } = useTasks();
@@ -170,7 +168,8 @@ export default function HomeScreen() {
   );
 
   // Hold a card to lift it. Where it lands is the new order; pushed to the
-  // right on the way down, it tucks under the stop above it.
+  // right, it joins the stack under the original stop — several supporters
+  // can hang off the same one.
   const listRef = useRef<FlatList<Task>>(null);
   const handleBeginEdit = useCallback((index: number) => {
     requestAnimationFrame(() => {
@@ -188,50 +187,33 @@ export default function HomeScreen() {
   const heldTask = heldIndex >= 0 ? activeTasks[heldIndex] : null;
   const handleDrop = useCallback(
     (id: string, to: number, intent: DropIntent) => {
-      reorderTask(id, to);
-      if (intent === 'untuck') {
-        clearAfter(id);
+      const result = dropInList(id, to, intent);
+      if (result.kind === 'nothing-above') {
+        showToast({
+          title: 'Nothing above',
+          subtitle: 'Drop it under a stop to tuck it',
+          icon: 'arrow.uturn.backward',
+          tint: theme.textSecondary,
+          durationMs: 2200,
+        });
         return;
       }
-      // The store has already moved; work out the new neighbour above.
-      const open = tasksRef.current.filter((t) => !t.completed);
-      const from = open.findIndex((t) => t.id === id);
-      if (from < 0) return;
-      const next = [...open];
-      const [moved] = next.splice(from, 1);
-      next.splice(Math.max(0, Math.min(to, next.length)), 0, moved);
-      const above = next[next.indexOf(moved) - 1];
-      if (intent === 'tuck') {
-        if (!above) {
-          showToast({
-            title: 'Nothing above',
-            subtitle: 'Drop it under a stop to tuck it',
-            icon: 'arrow.uturn.backward',
-            tint: theme.textSecondary,
-            durationMs: 2200,
-          });
-          return;
-        }
-        const r = linkAfter(id, above.id);
-        if (r === 'refused') {
-          showToast({
-            title: 'Kept apart',
-            subtitle: `${above.text.length > 28 ? above.text.slice(0, 28) + '…' : above.text} already waits on this one`,
-            icon: 'arrow.triangle.2.circlepath',
-            tint: theme.textSecondary,
-            durationMs: 2600,
-          });
-        } else if (r === 'linked' && settings.hapticsEnabled) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
+      if (result.kind === 'refused') {
+        const name = result.parent.length > 28 ? result.parent.slice(0, 28) + '…' : result.parent;
+        showToast({
+          title: 'Kept apart',
+          subtitle: `${name} already waits on this one`,
+          icon: 'arrow.triangle.2.circlepath',
+          tint: theme.textSecondary,
+          durationMs: 2600,
+        });
         return;
       }
-      // A move that no longer sits under someone it waited on drops the nest.
-      if (moved.after?.length && (!above || !moved.after.includes(above.id))) {
-        clearAfter(id);
+      if (result.kind === 'tucked' && settings.hapticsEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     },
-    [reorderTask, clearAfter, linkAfter, showToast, theme.textSecondary, settings.hapticsEnabled],
+    [dropInList, showToast, theme.textSecondary, settings.hapticsEnabled],
   );
 
   const renderItem = useCallback(

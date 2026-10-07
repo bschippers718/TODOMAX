@@ -433,7 +433,7 @@ function TaskItemInner({
     });
 
   // Hold still and the card lifts. Move it and the list makes room; push it
-  // to the right and it tucks under the stop above; let go without moving and
+  // to the right and it joins the stack under the original stop above; let go without moving and
   // the tray opens. Any movement before the hold fires hands the touch to the
   // pen or the scroll.
   const canDrag = Boolean(drag && onDrop);
@@ -733,7 +733,7 @@ function TaskItemInner({
             ...(canDrag && index > 0
               ? [
                   { name: 'moveUp', label: 'Move up' },
-                  { name: 'tuck', label: 'Tuck under previous' },
+                  { name: 'tuck', label: 'Tuck into the stack above' },
                 ]
               : []),
             ...(canDrag && index < count - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
