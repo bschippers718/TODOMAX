@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ToDOMax — Landing page variants</title>
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@900&family=Inter:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F6F3EC; --enamel: #fff; --ink: #0B0B0C; --yellow: #FCCC0A;
+    --red: #EE352E; --blue: #0039A6; --green: #00933C; --grey: #808183;
+    --bw: 2.5px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: Inter, system-ui, sans-serif; font-size: 17px; line-height: 1.5;
+  }
+  .strip { display: grid; grid-template-columns: repeat(7, 1fr); height: 10px; }
+  .strip i:nth-child(1) { background: var(--red); }
+  .strip i:nth-child(2) { background: var(--blue); }
+  .strip i:nth-child(3) { background: var(--green); }
+  .strip i:nth-child(4) { background: #FF6319; }
+  .strip i:nth-child(5) { background: #B933AD; }
+  .strip i:nth-child(6) { background: var(--yellow); }
+  .strip i:nth-child(7) { background: var(--grey); }
+  .wrap { width: min(720px, calc(100% - 40px)); margin: 0 auto; padding: 48px 0 72px; }
+  .ps { font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+  h1 { font-family: Archivo, sans-serif; font-weight: 900; letter-spacing: -.035em; font-size: clamp(36px, 6vw, 52px); line-height: .95; margin: 14px 0 16px; }
+  p { margin: 0 0 28px; color: #2A2A2D; max-width: 46ch; }
+  .list { display: grid; gap: 16px; }
+  a.card {
+    display: grid; gap: 8px; text-decoration: none; color: inherit;
+    background: var(--enamel); border: var(--bw) solid var(--ink); border-radius: 6px;
+    box-shadow: 5px 5px 0 var(--ink); padding: 22px 22px 24px;
+    transition: transform .1s, box-shadow .1s;
+  }
+  a.card:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--ink); }
+  a.card strong { font-family: Archivo, sans-serif; font-weight: 900; font-size: 24px; letter-spacing: -.03em; }
+  a.card span { color: #4C4C50; font-size: 15px; }
+  .grade { display: inline-block; font-family: 'Press Start 2P', monospace; font-size: 10px; background: var(--yellow); border: 2px solid var(--ink); padding: 6px 8px 5px; margin-top: 4px; width: max-content; }
+  footer { margin-top: 36px; font-size: 14px; color: #4C4C50; }
+</style>
+</head>
+<body>
+<div class="strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<main class="wrap">
+  <div class="ps">ToDOMax · Review</div>
+  <h1>Three Signal landings. Pick a train.</h1>
+  <p>Copy pass for voice: dry, Brooklyn, jokes you only get if you get them. Open each, read it out loud, send notes.</p>
+  <div class="list">
+    <a class="card" href="v1-signal.html">
+      <div class="ps">Variant 1</div>
+      <strong>You cross it off. Something happens.</strong>
+      <span>Phone mock + packs board + Daily Route. The full product tour.</span>
+      <span class="grade">Grade A−</span>
+    </a>
+    <a class="card" href="v2-signal-movie.html">
+      <div class="ps">Variant 2</div>
+      <strong>The reward is three seconds long.</strong>
+      <span>Hero celebration movie. Strongest headline. Cinematic board.</span>
+      <span class="grade">Grade A</span>
+    </a>
+    <a class="card" href="v3-signal-demo.html">
+      <div class="ps">Variant 3</div>
+      <strong>Cross one stop off. Try it.</strong>
+      <span>Interactive strike demo. Best for “just feel it.”</span>
+      <span class="grade">Grade A−</span>
+    </a>
+  </div>
+  <footer>Made in Brooklyn. Not the brand. The borough.</footer>
+</main>
+</body>
+</html>
