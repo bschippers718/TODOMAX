@@ -333,7 +333,7 @@ export default function HomeScreen() {
         >
           {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : boardClear ? 'End of the line.' : 'Where to today?'}
         </Text>
-        <DailyRoute tasks={tasks} streak={streak} variant="inline" />
+        <DailyRoute tasks={tasks} streak={streak} variant="inline" haptics={settings.hapticsEnabled} />
       </View>
       <View style={styles.glyphRow}>
         <PressableScale
@@ -414,7 +414,7 @@ export default function HomeScreen() {
   // Board clear → the one place the route gets a card: it's the day's summary.
   // An empty board with nothing done today stays quiet.
   const signalEmpty = boardClear ? (
-    <DailyRoute tasks={tasks} streak={streak} variant="card" />
+    <DailyRoute tasks={tasks} streak={streak} variant="card" haptics={settings.hapticsEnabled} />
   ) : (
     <View style={styles.quietEmpty}>
       <Text style={[styles.quietEmptyText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>

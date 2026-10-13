@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Share, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Task, TaskSize, taskSize } from '../lib/types';
 import { useTheme } from '../lib/theme';
 import { useDayTick } from '../hooks/useDayTick';
+import { buildServiceAdvisory } from '../lib/serviceAdvisory';
+import { PressableScale } from './ui/PressableScale';
+import { Symbol } from './ui/Symbol';
 
 type StopKind = 'done' | 'carried' | 'open';
 type Stop = { kind: StopKind; size: TaskSize };
@@ -47,6 +51,17 @@ export function buildRoute(tasks: Task[], now = Date.now()): { stops: Stop[]; do
   return { stops, done: groups.done.length, carried: groups.carried.length, open: groups.open.length };
 }
 
+/**
+ * Anonymous colour grid as a service bulletin — no task text, safe to post.
+ * Framed like a transfer ticket, not a productivity flex.
+ */
+export function routeShareText(stops: Stop[], streak: number, now = new Date()): string {
+  const squares = stops.map((s) => (s.kind === 'done' ? '🟩' : s.kind === 'carried' ? '🟧' : '⬜')).join('');
+  const day = `${DAYS[now.getDay()]} · ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+  const streakLine = streak > 0 ? `\n${streak}-day streak` : '';
+  return `SERVICE BULLETIN\nToDOMax · ${day}\n${squares || '⬜'}${streakLine}\ntodomax.app`;
+}
+
 function summaryOf(done: number, carried: number, open: number): string {
   if (done + carried + open === 0) return 'No stops yet';
   return [done && `Done ${done}`, carried && `Carried ${carried}`, open && `Open ${open}`].filter(Boolean).join(' · ');
@@ -57,46 +72,83 @@ interface Props {
   streak: number;
   /** `inline`: quiet row of small squares under the headline. `card`: the board-clear summary. */
   variant?: 'inline' | 'card';
+  haptics?: boolean;
 }
 
-export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
+export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }: Props) {
   const theme = useTheme();
   const day = useDayTick();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks, day]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const advisory = useMemo(() => buildServiceAdvisory(tasks), [tasks, day]);
   const colorFor = (s: Stop) => (s.kind === 'done' ? theme.green : s.kind === 'carried' ? theme.orange : 'transparent');
   // A big stop is a wider square; a small one is a little narrower.
   const widthFor = (s: Stop, base: number) =>
     s.size === 'xl' ? Math.round(base * 2.2) : s.size === 'l' ? Math.round(base * 1.7) : s.size === 's' ? Math.round(base * 0.75) : base;
   const summary = summaryOf(done, carried, open);
 
+  const share = async () => {
+    if (!stops.length) return;
+    if (haptics) Haptics.selectionAsync();
+    try {
+      await Share.share({ message: routeShareText(stops, streak) });
+    } catch {
+      // user dismissed the sheet
+    }
+  };
+
   if (variant === 'inline') {
     const shown = stops.slice(0, MAX_INLINE);
     const overflow = stops.length - shown.length;
     return (
-      <View style={styles.inline} accessible accessibilityLabel={`Daily route, ${summary}${streak > 0 ? `, ${streak} day streak` : ''}`}>
-        <View style={styles.inlineRow}>
-          {shown.map((s, i) => (
-            <View
-              key={`${s.kind}-${i}`}
-              style={[
-                styles.inlineSquare,
-                { width: widthFor(s, 11), backgroundColor: colorFor(s), borderColor: s.kind === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
-              ]}
-            />
-          ))}
-          {overflow > 0 && (
-            <Text style={[styles.inlineMore, theme.fontLabel, { color: theme.textTertiary }]} allowFontScaling={false}>
-              +{overflow}
+      <View
+        style={styles.inlineBlock}
+        accessible
+        accessibilityLabel={`Daily route, ${summary}${streak > 0 ? `, ${streak} day streak` : ''}${advisory.line ? `, ${advisory.line}` : ''}`}
+      >
+        <View style={styles.inline}>
+          <View style={styles.inlineRow}>
+            {shown.map((s, i) => (
+              <View
+                key={`${s.kind}-${i}`}
+                style={[
+                  styles.inlineSquare,
+                  { width: widthFor(s, 11), backgroundColor: colorFor(s), borderColor: s.kind === 'open' ? theme.text : colorFor(s), borderRadius: theme.radiusTag },
+                ]}
+              />
+            ))}
+            {overflow > 0 && (
+              <Text style={[styles.inlineMore, theme.fontLabel, { color: theme.textTertiary }]} allowFontScaling={false}>
+                +{overflow}
+              </Text>
+            )}
+          </View>
+          {streak > 0 && (
+            <Text style={[styles.inlineStreak, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
+              {stops.length > 0 ? '·  ' : ''}
+              {streak}-day streak
             </Text>
           )}
+          {stops.length > 0 && (
+            <PressableScale
+              style={styles.inlineShare}
+              onPress={share}
+              pressedScale={0.88}
+              pressStyle="scale"
+              hitSlop={8}
+              accessibilityLabel="Share daily route bulletin"
+              accessibilityHint="Shares the colour grid only. No task names."
+            >
+              <Symbol name="square.and.arrow.up" size={13} color={theme.textTertiary} weight="medium" />
+            </PressableScale>
+          )}
         </View>
-        {streak > 0 && (
-          <Text style={[styles.inlineStreak, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
-            {stops.length > 0 ? '·  ' : ''}
-            {streak}-day streak
+        {advisory.line ? (
+          <Text style={[styles.advisory, theme.fontLabel, { color: theme.orange }]} maxFontSizeMultiplier={1.2} numberOfLines={2}>
+            {advisory.line}
           </Text>
-        )}
+        ) : null}
       </View>
     );
   }
@@ -144,10 +196,31 @@ export function DailyRoute({ tasks, streak, variant = 'inline' }: Props) {
         {open > 0 && <Legend color="transparent" border={theme.text} label={`Open ${open}`} text={theme.text} />}
       </View>
 
+      {advisory.line ? (
+        <Text style={[styles.cardAdvisory, theme.fontLabel, { color: theme.orange }]} maxFontSizeMultiplier={1.2} numberOfLines={2}>
+          {advisory.line}
+        </Text>
+      ) : null}
+
       <View style={[styles.cardFoot, { borderTopColor: theme.separator }]}>
         <Text style={[styles.streak, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
           {streak > 0 ? `${streak}-day streak` : 'First stop of a streak'}
         </Text>
+        <PressableScale
+          style={[
+            styles.shareButton,
+            theme.shadowControl,
+            { backgroundColor: theme.gold, borderColor: theme.cardBorder, borderWidth: 2, borderRadius: theme.radiusControl },
+          ]}
+          onPress={share}
+          accessibilityLabel="Share route bulletin"
+          accessibilityHint="Shares the colour grid only. No task names."
+        >
+          <Symbol name="square.and.arrow.up" size={14} color={theme.onGold} weight="bold" />
+          <Text style={[styles.shareText, theme.fontTask, { color: theme.onGold }]} maxFontSizeMultiplier={1.2}>
+            Share bulletin
+          </Text>
+        </PressableScale>
       </View>
     </View>
   );
@@ -165,10 +238,14 @@ function Legend({ color, border, label, text }: { color: string; border?: string
 }
 
 const styles = StyleSheet.create({
+  inlineBlock: {
+    marginTop: 8,
+    minHeight: 12,
+    flexShrink: 1,
+  },
   inline: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
     minHeight: 12,
     flexShrink: 1,
     overflow: 'hidden',
@@ -194,6 +271,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 4,
     flexShrink: 0,
+  },
+  inlineShare: {
+    marginLeft: 8,
+    flexShrink: 0,
+    paddingVertical: 2,
+  },
+  advisory: {
+    fontSize: 7,
+    marginTop: 8,
+    letterSpacing: 0.2,
   },
 
   card: {
@@ -248,7 +335,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  cardAdvisory: {
+    fontSize: 7,
+    marginTop: 12,
+    letterSpacing: 0.2,
+  },
   cardFoot: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -256,5 +351,20 @@ const styles = StyleSheet.create({
   streak: {
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
+    paddingRight: 10,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 3,
+    marginBottom: 3,
+    flexShrink: 0,
+  },
+  shareText: {
+    fontSize: 13,
   },
 });
