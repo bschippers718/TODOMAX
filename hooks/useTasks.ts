@@ -79,14 +79,30 @@ export function addTask(text: string, difficulty: 'normal' | 'hard' = 'normal') 
   return task;
 }
 
-export function completeTask(id: string, ink?: number[]) {
+export function completeTask(id: string, ink?: number[], pointsEarned?: number) {
   const now = Date.now();
-  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true, completedAt: now, ink: ink?.length ? ink : undefined } : t)));
+  setTasks((prev) =>
+    prev.map((t) =>
+      t.id === id
+        ? {
+            ...t,
+            completed: true,
+            completedAt: now,
+            ink: ink?.length ? ink : undefined,
+            pointsEarned: pointsEarned && pointsEarned > 0 ? pointsEarned : undefined,
+          }
+        : t,
+    ),
+  );
   setStreak((s) => advanceStreak(s, now));
 }
 
 export function uncompleteTask(id: string) {
-  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: false, completedAt: undefined, ink: undefined } : t)));
+  setTasks((prev) =>
+    prev.map((t) =>
+      t.id === id ? { ...t, completed: false, completedAt: undefined, ink: undefined, pointsEarned: undefined } : t,
+    ),
+  );
 }
 
 export function deleteTask(id: string) {

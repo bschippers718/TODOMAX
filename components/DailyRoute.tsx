@@ -4,7 +4,9 @@ import * as Haptics from 'expo-haptics';
 import { Task, TaskSize, taskSize } from '../lib/types';
 import { useTheme } from '../lib/theme';
 import { useDayTick } from '../hooks/useDayTick';
+import { useScore } from '../hooks/useScore';
 import { buildServiceAdvisory } from '../lib/serviceAdvisory';
+import { formatScore, ScoreState } from '../lib/scoring';
 import { PressableScale } from './ui/PressableScale';
 import { Symbol } from './ui/Symbol';
 
@@ -55,11 +57,19 @@ export function buildRoute(tasks: Task[], now = Date.now()): { stops: Stop[]; do
  * Anonymous colour grid as a service bulletin — no task text, safe to post.
  * Framed like a transfer ticket, not a productivity flex.
  */
-export function routeShareText(stops: Stop[], streak: number, now = new Date()): string {
+export function routeShareText(
+  stops: Stop[],
+  streak: number,
+  now = new Date(),
+  score?: Pick<ScoreState, 'dayScore' | 'dayHigh' | 'weekScore' | 'weekHigh'>,
+): string {
   const squares = stops.map((s) => (s.kind === 'done' ? '🟩' : s.kind === 'carried' ? '🟧' : '⬜')).join('');
   const day = `${DAYS[now.getDay()]} · ${MONTHS[now.getMonth()]} ${now.getDate()}`;
   const streakLine = streak > 0 ? `\n${streak}-day streak` : '';
-  return `SERVICE BULLETIN\nToDOMax · ${day}\n${squares || '⬜'}${streakLine}\ntodomax.app`;
+  const scoreLine = score
+    ? `\nTODAY ${formatScore(score.dayScore)} · HI ${formatScore(score.dayHigh)}\nWEEK ${formatScore(score.weekScore)} · HI ${formatScore(score.weekHigh)}`
+    : '';
+  return `SERVICE BULLETIN\nToDOMax · ${day}\n${squares || '⬜'}${streakLine}${scoreLine}\ntodomax.app`;
 }
 
 function summaryOf(done: number, carried: number, open: number): string {
@@ -78,6 +88,7 @@ interface Props {
 export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }: Props) {
   const theme = useTheme();
   const day = useDayTick();
+  const { score } = useScore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const { stops, done, carried, open } = useMemo(() => buildRoute(tasks), [tasks, day]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +103,7 @@ export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }
     if (!stops.length) return;
     if (haptics) Haptics.selectionAsync();
     try {
-      await Share.share({ message: routeShareText(stops, streak) });
+      await Share.share({ message: routeShareText(stops, streak, new Date(), score) });
     } catch {
       // user dismissed the sheet
     }
@@ -201,6 +212,11 @@ export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }
           {advisory.line}
         </Text>
       ) : null}
+
+      <Text style={[styles.cardScore, theme.fontLabel, { color: theme.textTertiary }]} allowFontScaling={false}>
+        TODAY {formatScore(score.dayScore)} · HI {formatScore(score.dayHigh)} · WEEK {formatScore(score.weekScore)} · HI{' '}
+        {formatScore(score.weekHigh)}
+      </Text>
 
       <View style={[styles.cardFoot, { borderTopColor: theme.separator }]}>
         <Text style={[styles.streak, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
@@ -336,6 +352,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardAdvisory: {
+    fontSize: 7,
+    marginTop: 12,
+    letterSpacing: 0.2,
+  },
+  cardScore: {
     fontSize: 7,
     marginTop: 12,
     letterSpacing: 0.2,

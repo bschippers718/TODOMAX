@@ -13,6 +13,7 @@ import { CELEBRATION_COOLDOWN_MS, MASSIVE_HOLD_MS, isQuietHour, Settings, TaskSi
 import { ANIMATION_META, getAnimationName } from '../lib/collection';
 import { getPackForAnimation, packAccent, PackId } from '../lib/packs';
 import { completeTask, useTasks } from './useTasks';
+import { awardStrike } from './useScore';
 
 // Matches CelebrationOverlay's cap for the minimal variant.
 export const MINIMAL_VISUAL_MS = 1100;
@@ -86,13 +87,21 @@ export function useStrikeFlow() {
     playComplete();
   }, [playComplete]);
 
-  // The card is gone: commit and roll the celebration.
+  // The card is gone: commit, score, and roll the celebration.
   const onComplete = useCallback(
     (id: string, size: TaskSize = 'm', ink?: number[]) => {
       const task = tasks.find((t) => t.id === id);
-      completeTask(id, ink);
-
       const now = Date.now();
+      const dayStart = new Date(now).setHours(0, 0, 0, 0);
+      const priorToday = tasks.filter((t) => t.completed && (t.completedAt ?? 0) >= dayStart && t.id !== id).length;
+      const remainingAfter = tasks.filter((t) => !t.completed && t.id !== id).length;
+
+      // Points first so the stamp on the task matches what we banked.
+      const award = task
+        ? awardStrike({ ...task, size }, { priorToday, remainingAfter, now })
+        : { base: 0, carried: 0, combo: 0, clear: 0, total: 0 };
+      completeTask(id, ink, award.total);
+
       // Size decides the weight of the moment (see CelebrationTier). A small
       // stop is always a glimpse; Big and Massive always get the whole scene,
       // even in rapid fire. Quiet hours win over everything.
@@ -102,8 +111,7 @@ export function useStrikeFlow() {
       setDamped(quiet);
 
       // Today's tally including this one; Streak Combo shows it as the combo count.
-      const dayStart = new Date(now).setHours(0, 0, 0, 0);
-      const struckToday = tasks.filter((t) => t.completed && (t.completedAt ?? 0) >= dayStart && t.id !== id).length + 1;
+      const struckToday = priorToday + 1;
       const animId = triggerCelebration(struckToday, quiet ? (tier === 'glimpse' ? 'glimpse' : 'scene') : tier, task?.text);
       if (!animId) return;
       playCelebration(animId);

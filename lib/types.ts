@@ -27,6 +27,8 @@ export interface Task {
    * w the pen width in points.
    */
   ink?: number[];
+  /** Points awarded when this stop was struck — used to claw back on restore. */
+  pointsEarned?: number;
 }
 
 export const TASK_SIZES: TaskSize[] = ['s', 'm', 'l', 'xl'];
