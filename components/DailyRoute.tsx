@@ -9,6 +9,7 @@ import { buildServiceAdvisory } from '../lib/serviceAdvisory';
 import { formatScore, ScoreState } from '../lib/scoring';
 import { PressableScale } from './ui/PressableScale';
 import { Symbol } from './ui/Symbol';
+import { ScoreStrip } from './ScoreStrip';
 
 type StopKind = 'done' | 'carried' | 'open';
 type Stop = { kind: StopKind; size: TaskSize };
@@ -113,12 +114,13 @@ export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }
     const shown = stops.slice(0, MAX_INLINE);
     const overflow = stops.length - shown.length;
     return (
-      <View
-        style={styles.inlineBlock}
-        accessible
-        accessibilityLabel={`Daily route, ${summary}${streak > 0 ? `, ${streak} day streak` : ''}${advisory.line ? `, ${advisory.line}` : ''}`}
-      >
+      <View style={styles.inlineBlock}>
         <View style={styles.inline}>
+          <View
+            style={styles.inlineMain}
+            accessible
+            accessibilityLabel={`Daily route, ${summary}${streak > 0 ? `, ${streak} day streak` : ''}${advisory.line ? `, ${advisory.line}` : ''}`}
+          >
           <View style={styles.inlineRow}>
             {shown.map((s, i) => (
               <View
@@ -141,20 +143,23 @@ export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }
               {streak}-day streak
             </Text>
           )}
+          </View>
           {stops.length > 0 && (
             <PressableScale
               style={styles.inlineShare}
               onPress={share}
-              pressedScale={0.88}
+              pressedScale={0.92}
               pressStyle="scale"
-              hitSlop={8}
-              accessibilityLabel="Share daily route bulletin"
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Share daily route"
               accessibilityHint="Shares the colour grid only. No task names."
             >
               <Symbol name="square.and.arrow.up" size={13} color={theme.textTertiary} weight="medium" />
             </PressableScale>
           )}
         </View>
+        <ScoreStrip variant="inline" />
         {advisory.line ? (
           <Text style={[styles.advisory, theme.fontLabel, { color: theme.orange }]} maxFontSizeMultiplier={1.2} numberOfLines={2}>
             {advisory.line}
@@ -213,29 +218,27 @@ export function DailyRoute({ tasks, streak, variant = 'inline', haptics = true }
         </Text>
       ) : null}
 
-      <Text style={[styles.cardScore, theme.fontLabel, { color: theme.textTertiary }]} allowFontScaling={false}>
-        TODAY {formatScore(score.dayScore)} · HI {formatScore(score.dayHigh)} · WEEK {formatScore(score.weekScore)} · HI{' '}
-        {formatScore(score.weekHigh)}
+      <Text style={[styles.cardScore, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
+        Today {formatScore(score.dayScore)}
+        {score.dayHigh > score.dayScore ? ` · best ${formatScore(score.dayHigh)}` : ''} · week {formatScore(score.weekScore)}
+        {score.weekHigh > score.weekScore ? ` · best ${formatScore(score.weekHigh)}` : ''}
       </Text>
 
-      <View style={[styles.cardFoot, { borderTopColor: theme.separator }]}>
+      <View style={styles.streakRow}>
         <Text style={[styles.streak, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
           {streak > 0 ? `${streak}-day streak` : 'First stop of a streak'}
         </Text>
         <PressableScale
-          style={[
-            styles.shareButton,
-            theme.shadowControl,
-            { backgroundColor: theme.gold, borderColor: theme.cardBorder, borderWidth: 2, borderRadius: theme.radiusControl },
-          ]}
+          style={styles.inlineShare}
           onPress={share}
-          accessibilityLabel="Share route bulletin"
+          pressedScale={0.92}
+          pressStyle="scale"
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Share daily route"
           accessibilityHint="Shares the colour grid only. No task names."
         >
-          <Symbol name="square.and.arrow.up" size={14} color={theme.onGold} weight="bold" />
-          <Text style={[styles.shareText, theme.fontTask, { color: theme.onGold }]} maxFontSizeMultiplier={1.2}>
-            Share bulletin
-          </Text>
+          <Symbol name="square.and.arrow.up" size={13} color={theme.textTertiary} weight="medium" />
         </PressableScale>
       </View>
     </View>
@@ -263,6 +266,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 12,
+    flexShrink: 1,
+  },
+  inlineMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flexShrink: 1,
     overflow: 'hidden',
   },
@@ -292,6 +300,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flexShrink: 0,
     paddingVertical: 2,
+  },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
   },
   advisory: {
     fontSize: 7,
@@ -357,35 +371,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   cardScore: {
-    fontSize: 7,
-    marginTop: 12,
-    letterSpacing: 0.2,
-  },
-  cardFoot: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    fontSize: 15,
+    fontWeight: '700',
     marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
+    letterSpacing: -0.2,
+    textAlign: 'center',
   },
   streak: {
     fontSize: 13,
     fontWeight: '700',
-    flexShrink: 1,
-    paddingRight: 10,
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 3,
-    marginBottom: 3,
-    flexShrink: 0,
-  },
-  shareText: {
-    fontSize: 13,
+    marginTop: 10,
+    textAlign: 'center',
   },
 });

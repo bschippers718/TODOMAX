@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, Keyboard } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Redirect, Stack, useRouter } from 'expo-router';
@@ -339,7 +339,6 @@ export default function HomeScreen() {
           {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : boardClear ? 'End of the line.' : 'Where to today?'}
         </Text>
         <DailyRoute tasks={tasks} streak={streak} variant="inline" haptics={settings.hapticsEnabled} />
-        <ScoreStrip variant="inline" />
       </View>
       <View style={styles.glyphRow}>
         <PressableScale
@@ -556,8 +555,9 @@ export default function HomeScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           contentInsetAdjustmentBehavior="automatic"
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={Keyboard.dismiss}
           alwaysBounceVertical
           showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={(info) => {

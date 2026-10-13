@@ -13,10 +13,10 @@ import {
   scoreStrike,
 } from '../lib/scoring';
 
-type State = { score: ScoreState; loaded: boolean };
+type State = { score: ScoreState; shown: ScoreState | null; loaded: boolean };
 type Listener = (s: State) => void;
 
-let state: State = { score: EMPTY_SCORE, loaded: false };
+let state: State = { score: EMPTY_SCORE, shown: null, loaded: false };
 const listeners = new Set<Listener>();
 let loadPromise: Promise<void> | null = null;
 
@@ -35,12 +35,29 @@ function loadOnce() {
     loadPromise = (async () => {
       const saved = await loadJSON<ScoreState>(KEYS.SCORE);
       const base = saved && typeof saved.dayScore === 'number' ? { ...EMPTY_SCORE, ...saved } : EMPTY_SCORE;
-      state = { score: rollScoreState(base), loaded: true };
+      state = { score: rollScoreState(base), shown: null, loaded: true };
       emit();
       if (state.score !== base) saveJSON(KEYS.SCORE, state.score);
     })();
   }
   return loadPromise;
+}
+
+/**
+ * Freeze the numbers on screen. The bank still updates; the reels wait
+ * until the celebration has finished, then spin up to the new total.
+ */
+export function holdScoreReveal() {
+  if (state.shown) return;
+  state = { ...state, shown: state.score };
+  emit();
+}
+
+/** Let the score strip catch up to what's been banked. */
+export function releaseScoreReveal() {
+  if (!state.shown) return;
+  state = { ...state, shown: null };
+  emit();
 }
 
 /** Award points for a strike; returns the breakdown and stamps `pointsEarned` on the task via caller. */
@@ -82,8 +99,10 @@ export function useScore() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, local.loaded]);
 
+  const live = rollScoreState(local.score);
   return {
-    score: rollScoreState(local.score),
+    // While a celebration is playing, keep the pre-strike numbers up.
+    score: local.shown ? rollScoreState(local.shown) : live,
     loaded: local.loaded,
   };
 }

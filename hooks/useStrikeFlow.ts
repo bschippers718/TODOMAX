@@ -13,7 +13,7 @@ import { CELEBRATION_COOLDOWN_MS, MASSIVE_HOLD_MS, isQuietHour, Settings, TaskSi
 import { ANIMATION_META, getAnimationName } from '../lib/collection';
 import { getPackForAnimation, packAccent, PackId } from '../lib/packs';
 import { completeTask, useTasks } from './useTasks';
-import { awardStrike } from './useScore';
+import { awardStrike, holdScoreReveal, releaseScoreReveal } from './useScore';
 
 // Matches CelebrationOverlay's cap for the minimal variant.
 export const MINIMAL_VISUAL_MS = 1100;
@@ -72,7 +72,12 @@ export function useStrikeFlow() {
     [damped, settings],
   );
 
-  const { celebration, triggerCelebration, dismissCelebration } = useCelebration(settings, pool);
+  const { celebration, triggerCelebration, dismissCelebration: endCelebration } = useCelebration(settings, pool);
+  // The reels roll when the movie leaves, including a tap-to-skip.
+  const dismissCelebration = useCallback(() => {
+    endCelebration();
+    releaseScoreReveal();
+  }, [endCelebration]);
   const { playComplete, playCelebration } = useSound(settings);
   const { recordEarned, hasNew, stats } = useCollection(pool);
   const { show: showToast, toast } = useToast();
@@ -96,7 +101,9 @@ export function useStrikeFlow() {
       const priorToday = tasks.filter((t) => t.completed && (t.completedAt ?? 0) >= dayStart && t.id !== id).length;
       const remainingAfter = tasks.filter((t) => !t.completed && t.id !== id).length;
 
-      // Points first so the stamp on the task matches what we banked.
+      // Bank the points now, but leave the numbers on screen alone until
+      // the celebration is over. Quiet mode has no movie, so it rolls at once.
+      if (settings.animationMode !== 'quiet') holdScoreReveal();
       const award = task
         ? awardStrike({ ...task, size }, { priorToday, remainingAfter, now })
         : { base: 0, carried: 0, combo: 0, clear: 0, total: 0 };
@@ -113,7 +120,10 @@ export function useStrikeFlow() {
       // Today's tally including this one; Streak Combo shows it as the combo count.
       const struckToday = priorToday + 1;
       const animId = triggerCelebration(struckToday, quiet ? (tier === 'glimpse' ? 'glimpse' : 'scene') : tier, task?.text);
-      if (!animId) return;
+      if (!animId) {
+        releaseScoreReveal();
+        return;
+      }
       playCelebration(animId);
 
       const fullMs = ANIMATION_DURATIONS[animId] + (tier === 'massive' && !quiet ? MASSIVE_HOLD_MS : 0);

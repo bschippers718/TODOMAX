@@ -32,6 +32,9 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
     if (hapticsEnabled) Haptics.selectionAsync();
     onAdd(trimmed);
     setText('');
+    // Return and the add button both finish the stop. Drop the keyboard so
+    // the board is the whole screen again.
+    inputRef.current?.blur();
   };
 
   const signal = theme.isSignal;
@@ -98,7 +101,7 @@ export function AddTaskInput({ onAdd, hapticsEnabled = true }: AddTaskInputProps
             placeholderTextColor={theme.textTertiary}
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
-            submitBehavior="submit"
+            submitBehavior="blurAndSubmit"
             enablesReturnKeyAutomatically
             keyboardAppearance={theme.isDark ? 'dark' : 'light'}
             autoCorrect

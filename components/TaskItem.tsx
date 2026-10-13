@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect, useState, memo } from 'react';
 import {
+  Keyboard,
   Text,
   View,
   StyleSheet,
@@ -171,7 +172,8 @@ function TaskItemInner({
     latest.current.onStrike?.(task.id);
   }, [task.id]);
   const firePenDown = useCallback(() => {
-    // Pen touches paper.
+    // Pen touches paper. The composer keyboard would cover the card.
+    Keyboard.dismiss();
     if (hapticsEnabled) Haptics.selectionAsync();
     setInking(true);
   }, [hapticsEnabled]);
@@ -198,6 +200,7 @@ function TaskItemInner({
     const now = Date.now();
     if (now - openedAt.current < 700) return;
     openedAt.current = now;
+    Keyboard.dismiss();
     router.push(`/task/${task.id}`);
   }, [ghost, router, task.id]);
 
@@ -205,6 +208,7 @@ function TaskItemInner({
   const latestDrop = useRef({ onHold, onDrop, index });
   latestDrop.current = { onHold, onDrop, index };
   const fireLift = useCallback(() => {
+    Keyboard.dismiss();
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     latestDrop.current.onHold?.(task.id);
   }, [hapticsEnabled, task.id]);
