@@ -80,7 +80,7 @@ export default function SettingsScreen() {
     ]);
   };
   const clearAll = () => {
-    Alert.alert('Clear all stops?', 'Open and struck. The streak and Collection stay.', [
+    Alert.alert('Clear all stops?', 'Open and struck. The streak, score and Collection stay.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear',

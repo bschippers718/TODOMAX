@@ -18,11 +18,13 @@ import { AddTaskInput } from '../components/AddTaskInput';
 import { CelebrationOverlay } from '../components/CelebrationOverlay';
 import { AppBackground } from '../components/AppBackground';
 import { DailyRoute, buildRoute, todayLabel } from '../components/DailyRoute';
+import { ScoreStrip } from '../components/ScoreStrip';
 import { PressableScale } from '../components/ui/PressableScale';
 import { Symbol } from '../components/ui/Symbol';
 import { useTheme, loudType } from '../lib/theme';
 import { Task, Settings, openUpstream } from '../lib/types';
 import { animateNextLayout } from '../lib/nativeLayout';
+import { revokeStrike } from '../hooks/useScore';
 
 const noop = () => {};
 
@@ -91,10 +93,12 @@ export default function HomeScreen() {
   // A struck stop goes back on the route with a tap. No confirm; it's a list.
   const handleRestore = useCallback(
     (id: string) => {
+      const task = tasks.find((t) => t.id === id);
+      if (task) revokeStrike(task);
       animateNextLayout(reduceMotion);
       uncompleteTask(id);
     },
-    [uncompleteTask, reduceMotion],
+    [tasks, uncompleteTask, reduceMotion],
   );
 
   // Today's strikes stay in view, newest at the bottom, so the day reads top to
@@ -282,6 +286,7 @@ export default function HomeScreen() {
         </Text>
       </View>
       <View style={styles.headerRight}>
+        <ScoreStrip variant="badge" />
         <View
           style={[
             styles.streakBadge,
@@ -333,7 +338,8 @@ export default function HomeScreen() {
         >
           {remaining > 0 ? `${remaining} stop${remaining !== 1 ? 's' : ''} to go` : boardClear ? 'End of the line.' : 'Where to today?'}
         </Text>
-        <DailyRoute tasks={tasks} streak={streak} variant="inline" />
+        <DailyRoute tasks={tasks} streak={streak} variant="inline" haptics={settings.hapticsEnabled} />
+        <ScoreStrip variant="inline" />
       </View>
       <View style={styles.glyphRow}>
         <PressableScale
@@ -414,7 +420,7 @@ export default function HomeScreen() {
   // Board clear → the one place the route gets a card: it's the day's summary.
   // An empty board with nothing done today stays quiet.
   const signalEmpty = boardClear ? (
-    <DailyRoute tasks={tasks} streak={streak} variant="card" />
+    <DailyRoute tasks={tasks} streak={streak} variant="card" haptics={settings.hapticsEnabled} />
   ) : (
     <View style={styles.quietEmpty}>
       <Text style={[styles.quietEmptyText, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.3}>
