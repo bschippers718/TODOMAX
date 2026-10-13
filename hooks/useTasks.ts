@@ -113,6 +113,47 @@ export function editTask(id: string, text: string) {
   setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, text: text.trim() } : t)));
 }
 
+/**
+ * Fields edited from the stop sheet. `null` clears an optional field.
+ * An empty text is ignored so a blank field can't erase the stop.
+ */
+export function updateTask(
+  id: string,
+  patch: {
+    text?: string;
+    size?: TaskSize;
+    line?: LineId | null;
+    due?: number | null;
+    url?: string | null;
+  },
+) {
+  setTasks((prev) =>
+    prev.map((t) => {
+      if (t.id !== id) return t;
+      const next: Task = { ...t };
+      if (patch.text !== undefined) {
+        const text = patch.text.trim();
+        if (text) next.text = text;
+      }
+      if (patch.size !== undefined) next.size = patch.size;
+      if (patch.line !== undefined) {
+        if (patch.line) next.line = patch.line;
+        else delete next.line;
+      }
+      if (patch.due !== undefined) {
+        if (patch.due == null) delete next.due;
+        else next.due = patch.due;
+      }
+      if (patch.url !== undefined) {
+        const url = patch.url?.trim();
+        if (url) next.url = url;
+        else delete next.url;
+      }
+      return next;
+    }),
+  );
+}
+
 export function setTaskSize(id: string, size: TaskSize) {
   setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, size } : t)));
 }
@@ -262,6 +303,7 @@ export function useTasks() {
       deleteTask,
       restoreTask,
       editTask,
+      updateTask,
       setTaskSize,
       setTaskLine,
       reorderTask,

@@ -41,6 +41,8 @@ export interface Theme {
   /** Extra line colours; only Signal gives them meaning. */
   orange: string;
   purple: string;
+  /** Light line, always read with dark ink. */
+  baby: string;
   grey: string;
   /** Primary filled button (add, choose photo). */
   buttonFill: string;
@@ -155,6 +157,7 @@ export const LIGHT: Theme = {
   blue: '#007AFF',
   orange: '#D9772B',
   purple: '#8A5BD6',
+  baby: '#79D2F2',
   grey: '#9C9285',
   buttonFill: '#221F1A',
   buttonText: '#FFFFFF',
@@ -193,6 +196,7 @@ export const DARK: Theme = {
   blue: '#0A84FF',
   orange: '#F08A3E',
   purple: '#A98BE8',
+  baby: '#8FDCFA',
   grey: '#737A8A',
   buttonFill: '#F4EFE6',
   buttonText: '#10121C',
@@ -220,6 +224,7 @@ export const SIGNAL_LINES = {
   expressBlue: '#0039A6',
   transferOrange: '#FF6319',
   localPurple: '#B933AD',
+  babyBlue: '#8EDEF8',
   shuttleGrey: '#808183',
 } as const;
 
@@ -247,6 +252,7 @@ export const SIGNAL_LIGHT: Theme = {
   blue: SIGNAL_LINES.expressBlue,
   orange: SIGNAL_LINES.transferOrange,
   purple: SIGNAL_LINES.localPurple,
+  baby: SIGNAL_LINES.babyBlue,
   grey: SIGNAL_LINES.shuttleGrey,
   buttonFill: SIGNAL_LINES.routeYellow,
   buttonText: SIGNAL_LINES.ink,

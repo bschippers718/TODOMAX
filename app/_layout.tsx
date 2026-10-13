@@ -70,6 +70,7 @@ export default function RootLayout() {
           {/* The Map is another view of the same list, not a destination: cross-fade. */}
           <Stack.Screen name="map" options={{ headerShown: false, animation: 'fade', animationDuration: 220 }} />
           <Stack.Screen name="settings" options={sheetOptions} />
+          <Stack.Screen name="task/[id]" options={sheetOptions} />
           <Stack.Screen name="packs" options={sheetOptions} />
           <Stack.Screen name="collection" options={sheetOptions} />
         </Stack>

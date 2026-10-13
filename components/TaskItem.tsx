@@ -3,12 +3,12 @@ import {
   Text,
   View,
   StyleSheet,
-  TextInput,
   Pressable,
   useWindowDimensions,
   LayoutChangeEvent,
   AccessibilityActionEvent,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,9 +25,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { Task, Settings, TaskSize, LineId, TASK_SIZES, TASK_SIZE_LABEL, taskSize, isBig } from '../lib/types';
-import { useTheme, IOS_SPRING, Theme } from '../lib/theme';
-import { LINES, lineColor, onLineColor } from '../lib/lines';
+import { Task, Settings, TaskSize, taskSize, isBig } from '../lib/types';
+import { useTheme, IOS_SPRING } from '../lib/theme';
+import { lineColor, onLineColor } from '../lib/lines';
+import { dueLabel, isOverdue, linkLabel } from '../lib/taskMeta';
 import { Symbol } from './ui/Symbol';
 import { InkTrail, pushInkPoint } from './InkTrail';
 import { DragState, slotFor, settleOffset, ghostDx, TUCK_DX, INDENT } from '../lib/dragList';
@@ -61,7 +62,7 @@ const MODE_LIFT = 3;
 
 // Hold still this long and the card lifts off the page.
 const HOLD_MS = 420;
-// Under this much travel a hold-and-release is a tap-and-hold: open the tray.
+// Under this much travel a hold-and-release opens the stop.
 const HOLD_STILL = 12;
 const SPRING_LIFT = { damping: 18, stiffness: 320, mass: 0.6 };
 const SPRING_SETTLE = { damping: 24, stiffness: 300, mass: 0.8, overshootClamping: true };
@@ -76,7 +77,7 @@ interface TaskItemProps {
   index?: number;
   /** Open stops in the list; bounds the drag. */
   count?: number;
-  /** Shared drag bookkeeping; without it, hold just opens the tray. */
+  /** Shared drag bookkeeping; without it, hold just opens the stop. */
   drag?: DragState;
   /** Card lifted (id) or put down (null). The list raises the held cell. */
   onHold?: (id: string | null) => void;
@@ -90,13 +91,8 @@ interface TaskItemProps {
   /** Fired after the card has fully collapsed and can be removed from the list. */
   onComplete: (id: string, size: TaskSize, ink?: number[]) => void;
   onDelete: (id: string) => void;
-  onEdit?: (id: string, text: string) => void;
-  onSize?: (id: string, size: TaskSize) => void;
-  onLine?: (id: string, line: LineId | undefined) => void;
   /** Open stops this one comes after (texts), shown as a quiet hint. */
   upstream?: string[];
-  /** The list scrolls this row into view when the tray opens. */
-  onBeginEdit?: (index: number) => void;
 }
 
 function TaskItemInner({
@@ -112,12 +108,9 @@ function TaskItemInner({
   onStrike,
   onComplete,
   onDelete,
-  onEdit,
-  onSize,
-  onLine,
   upstream,
-  onBeginEdit,
 }: TaskItemProps) {
+  const router = useRouter();
   const theme = useTheme();
   const { width: SW } = useWindowDimensions();
   const DELETE_THRESHOLD = SW * 0.3;
@@ -154,13 +147,9 @@ function TaskItemInner({
   const intentHint = useSharedValue(0);
   const rowRef = useAnimatedRef<Animated.View>();
 
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(task.text);
   const size = taskSize(task);
   const big = isBig(size);
   const line = task.line;
-  const inputRef = useRef<TextInput>(null);
-
   const hapticsEnabled = settings.hapticsEnabled;
 
   // Worklets and the VoiceOver handler are built once per row; they call
@@ -198,18 +187,19 @@ function TaskItemInner({
   }, [hapticsEnabled]);
   const clearInk = useCallback(() => setInking(false), []);
 
-  const beginEdit = useCallback(
-    (opts?: { haptic?: boolean }) => {
-      if (!onEdit) return;
-      if ((opts?.haptic ?? true) && hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setDraft(task.text);
-      editingRef.current = true;
-      setEditing(true);
-      onBeginEdit?.(index);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    },
-    [onEdit, hapticsEnabled, task.text, onBeginEdit, index],
-  );
+  // A tap reads the whole stop. Hold-and-release lands here too, so the old
+  // "let go to edit" path opens the same sheet. A second call in the same
+  // moment (the press and the hold both ending) must not push twice.
+  const openedAt = useRef(0);
+  const strikeRef = useRef<() => void>(() => {});
+  const fireBullet = useCallback(() => strikeRef.current(), []);
+  const openStop = useCallback(() => {
+    if (ghost) return;
+    const now = Date.now();
+    if (now - openedAt.current < 700) return;
+    openedAt.current = now;
+    router.push(`/task/${task.id}`);
+  }, [ghost, router, task.id]);
 
   // ---- Hold to lift ---------------------------------------------------------
   const latestDrop = useRef({ onHold, onDrop, index });
@@ -242,8 +232,8 @@ function TaskItemInner({
   );
   const releaseToEdit = useCallback(() => {
     putDown();
-    beginEdit({ haptic: false });
-  }, [putDown, beginEdit]);
+    openStop();
+  }, [putDown, openStop]);
 
   // The list needs every row's height to know where the slots are. Layout
   // only fires on a size change, so re-register when the index moves too.
@@ -257,16 +247,6 @@ function TaskItemInner({
       return v;
     });
   }, [drag, index, ghost]);
-
-  const editingRef = useRef(false);
-  const commitEdit = useCallback(() => {
-    // Return and the blur it causes both land here; commit once.
-    if (!editingRef.current) return;
-    editingRef.current = false;
-    const trimmed = draft.trim();
-    setEditing(false);
-    if (trimmed && trimmed !== task.text) onEdit?.(task.id, trimmed);
-  }, [draft, task.id, task.text, onEdit]);
 
   const collapseOut = (delay: number, done: () => void) => {
     'worklet';
@@ -362,7 +342,7 @@ function TaskItemInner({
   const inset = theme.borderWidth;
 
   const panGesture = Gesture.Pan()
-    .enabled(!editing && !ghost)
+    .enabled(!ghost)
     .maxPointers(1)
     .activeOffsetX([-10, 10])
     // A scribble rarely starts dead horizontal; give it a little slack
@@ -433,12 +413,12 @@ function TaskItemInner({
     });
 
   // Hold still and the card lifts. Move it and the list makes room; push it
-  // to the right and it joins the stack under the original stop above; let go without moving and
-  // the tray opens. Any movement before the hold fires hands the touch to the
-  // pen or the scroll.
+  // to the right and it joins the stack under the original stop above; let go
+  // without moving and the stop opens. Any movement before the hold fires
+  // hands the touch to the pen or the scroll.
   const canDrag = Boolean(drag && onDrop);
   const holdPan = Gesture.Pan()
-    .enabled(!editing && !ghost && (canDrag || Boolean(onEdit)))
+    .enabled(!ghost)
     .maxPointers(1)
     .activateAfterLongPress(HOLD_MS)
     .onStart(() => {
@@ -512,7 +492,22 @@ function TaskItemInner({
       if (mode.value === MODE_LIFT) mode.value = MODE_NONE;
     });
 
-  const gesture = Gesture.Race(holdPan, panGesture);
+  // A tap that never becomes a pen stroke or a hold opens the stop. The stop
+  // number is excluded: that tap still strikes, from here if the button's
+  // own press doesn't win the touch.
+  const tapGesture = Gesture.Tap()
+    .enabled(!ghost && !struck)
+    .maxDuration(HOLD_MS - 40)
+    .maxDistance(12)
+    .onEnd((e) => {
+      if (signal && e.x < 58) {
+        runOnJS(fireBullet)();
+        return;
+      }
+      runOnJS(openStop)();
+    });
+
+  const gesture = Gesture.Race(holdPan, panGesture, tapGesture);
 
   const onCardLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -615,12 +610,13 @@ function TaskItemInner({
   // same mark, the same moment, one finger less. (VoiceOver's "Complete" does
   // the same thing.)
   const strikeFromBullet = useCallback(() => {
-    if (committed.value || editing) return;
+    if (committed.value) return;
     committed.value = true;
     firePenDown();
     strikeWithoutFinger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, firePenDown]);
+  }, [firePenDown]);
+  strikeRef.current = strikeFromBullet;
 
   const onAccessibilityAction = useCallback(
     (e: AccessibilityActionEvent) => {
@@ -636,8 +632,8 @@ function TaskItemInner({
           committed.value = true;
           flingOutAndDelete();
           break;
-        case 'edit':
-          beginEdit();
+        case 'open':
+          openStop();
           break;
         case 'moveUp':
           if (index > 0) latestDrop.current.onDrop?.(task.id, index - 1, 'move');
@@ -654,13 +650,12 @@ function TaskItemInner({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [beginEdit, task.id],
+    [openStop, task.id],
   );
 
   const radius = { borderRadius: theme.radiusCard };
-  // A line colours the whole card, not just its marker. Editing drops back to
-  // the plain surface so the tray's controls stay legible.
-  const painted = Boolean(line) && !editing;
+  // A line colours the whole card, not just its marker.
+  const painted = Boolean(line);
   const paint = painted ? lineColor(line!, theme) : null;
   const onPaint = painted ? onLineColor(line!, theme) : null;
   // The index bullet: on a painted card it's the inverse (ink bubble, coloured
@@ -716,20 +711,20 @@ function TaskItemInner({
             {
               backgroundColor: paint ?? theme.surface,
               borderWidth: theme.borderWidth,
-              borderColor: editing ? theme.accent : theme.cardBorder,
+              borderColor: theme.cardBorder,
             },
             signal && styles.cardSignal,
             cardSlideStyle,
           ]}
-          accessible={!editing}
+          accessible
           accessibilityRole="button"
           accessibilityLabel={task.text}
-          accessibilityHint={struck ? undefined : 'Actions available'}
+          accessibilityHint={struck ? undefined : 'Tap to read the whole stop'}
           accessibilityState={{ busy: struck }}
           accessibilityActions={[
             { name: 'complete', label: 'Complete' },
             { name: 'delete', label: 'Delete' },
-            ...(onEdit ? [{ name: 'edit', label: 'Edit' }] : []),
+            { name: 'open', label: 'Open' },
             ...(canDrag && index > 0
               ? [
                   { name: 'moveUp', label: 'Move up' },
@@ -757,7 +752,7 @@ function TaskItemInner({
             {signal && (
               <Pressable
                 onPress={strikeFromBullet}
-                disabled={editing || struck}
+                disabled={struck}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel={`Strike stop ${index + 1}`}
@@ -774,48 +769,34 @@ function TaskItemInner({
               </Pressable>
             )}
 
-            {editing ? (
-              <View style={styles.body}>
-                <TextInput
-                  ref={inputRef}
-                  style={[textStyle, styles.taskInput]}
-                  value={draft}
-                  onChangeText={setDraft}
-                  onSubmitEditing={commitEdit}
-                  onBlur={commitEdit}
-                  returnKeyType="done"
-                  multiline={false}
-                  selectTextOnFocus
-                  keyboardAppearance={theme.isDark ? 'dark' : 'light'}
+            <Animated.View style={[styles.body, textAnimStyle]}>
+              <Text style={textStyle} numberOfLines={big ? 4 : 3} maxFontSizeMultiplier={1.3}>
+                {task.text}
+              </Text>
+              {upstream && upstream.length > 0 && !struck && (
+                <Text
+                  style={[styles.upstream, painted ? { color: onPaint!, opacity: 0.8 } : { color: theme.textTertiary }]}
+                  numberOfLines={1}
                   maxFontSizeMultiplier={1.3}
-                  accessibilityLabel="Edit task"
-                />
-                <EditTray
-                  theme={theme}
-                  size={size}
-                  line={line}
-                  onSize={onSize ? (v) => { if (hapticsEnabled) Haptics.selectionAsync(); onSize(task.id, v); } : undefined}
-                  onLine={onLine ? (v) => { if (hapticsEnabled) Haptics.selectionAsync(); onLine(task.id, v); } : undefined}
-                  onDone={commitEdit}
-                />
-              </View>
-            ) : (
-              <Animated.View style={[styles.body, textAnimStyle]}>
-                <Text style={textStyle} numberOfLines={big ? 4 : 3} maxFontSizeMultiplier={1.3}>
-                  {task.text}
+                >
+                  after {upstream[0]}
+                  {upstream.length > 1 ? ` +${upstream.length - 1}` : ''}
                 </Text>
-                {upstream && upstream.length > 0 && !struck && (
-                  <Text
-                    style={[styles.upstream, painted ? { color: onPaint!, opacity: 0.8 } : { color: theme.textTertiary }]}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    after {upstream[0]}
-                    {upstream.length > 1 ? ` +${upstream.length - 1}` : ''}
-                  </Text>
-                )}
-              </Animated.View>
-            )}
+              )}
+              {(task.due || task.url) && !struck && (
+                <Text
+                  style={[styles.upstream, painted ? { color: onPaint!, opacity: 0.8 } : { color: theme.textTertiary }]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  {task.due ? (
+                    <Text style={!painted && isOverdue(task.due) ? { color: theme.accent } : undefined}>{dueLabel(task.due)}</Text>
+                  ) : null}
+                  {task.due && task.url ? '  ·  ' : null}
+                  {task.url ? linkLabel(task.url) : null}
+                </Text>
+              )}
+            </Animated.View>
 
             {inking && (
               <InkTrail points={inkPoints} count={inkCount} opacity={inkOpacity} color={inkColor} square={signal} />
@@ -828,103 +809,6 @@ function TaskItemInner({
 }
 
 export const TaskItem = memo(TaskItemInner);
-
-/**
- * Size and line live in the edit state, where you're already looking at one
- * task on purpose. Nothing here is asked at add time.
- */
-function EditTray({
-  theme,
-  size,
-  line,
-  onSize,
-  onLine,
-  onDone,
-}: {
-  theme: Theme;
-  size: TaskSize;
-  line: LineId | undefined;
-  onSize?: (s: TaskSize) => void;
-  onLine?: (l: LineId | undefined) => void;
-  onDone: () => void;
-}) {
-  const signal = theme.isSignal;
-  return (
-    <View style={[styles.tray, { borderTopColor: theme.separator }]}>
-      {onSize && (
-        <View style={styles.trayGroup} accessibilityRole="radiogroup" accessibilityLabel="Size">
-          {TASK_SIZES.map((s) => {
-            const on = s === size;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => onSize(s)}
-                hitSlop={6}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={TASK_SIZE_LABEL[s]}
-                style={[
-                  styles.sizeChip,
-                  s === 's' && styles.sizeChipS,
-                  s === 'l' && styles.sizeChipL,
-                  s === 'xl' && styles.sizeChipXL,
-                  {
-                    borderColor: on ? theme.text : theme.textTertiary,
-                    backgroundColor: on ? theme.text : 'transparent',
-                    borderRadius: theme.radiusTag,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.sizeChipText, signal && theme.fontLabel, { color: on ? theme.bg : theme.textSecondary }]}
-                  allowFontScaling={false}
-                >
-                  {s.toUpperCase()}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-      {onLine && (
-        <View style={styles.trayGroup} accessibilityRole="radiogroup" accessibilityLabel="Line">
-          <Pressable
-            onPress={() => onLine(undefined)}
-            hitSlop={6}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: !line }}
-            accessibilityLabel="No line"
-            style={[styles.swatch, styles.swatchNone, { borderColor: !line ? theme.text : theme.textTertiary }]}
-          >
-            <View style={[styles.swatchSlash, { backgroundColor: !line ? theme.text : theme.textTertiary }]} />
-          </Pressable>
-          {LINES.map((l) => {
-            const on = l.id === line;
-            return (
-              <Pressable
-                key={l.id}
-                onPress={() => onLine(l.id)}
-                hitSlop={6}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={`${l.name} line`}
-                style={[
-                  styles.swatch,
-                  { backgroundColor: lineColor(l.id, theme), borderColor: on ? theme.text : 'transparent', borderRadius: signal ? 3 : 10 },
-                ]}
-              />
-            );
-          })}
-        </View>
-      )}
-      <Pressable onPress={onDone} hitSlop={8} style={styles.trayDone} accessibilityRole="button" accessibilityLabel="Done editing">
-        <Text style={[styles.trayDoneText, { color: theme.blue }]} maxFontSizeMultiplier={1.2}>
-          Done
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -1018,10 +902,6 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     letterSpacing: -0.9,
   },
-  taskInput: {
-    paddingVertical: 0,
-    margin: 0,
-  },
   cardInnerSmall: {
     paddingVertical: 9,
   },
@@ -1054,66 +934,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 3,
-  },
-  tray: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  trayGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sizeChip: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-  },
-  sizeChipS: {
-    width: 22,
-    height: 22,
-  },
-  sizeChipL: {
-    width: 32,
-    height: 32,
-  },
-  sizeChipXL: {
-    width: 38,
-    height: 38,
-  },
-  sizeChipText: {
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  swatch: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-  },
-  swatchNone: {
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swatchSlash: {
-    width: 12,
-    height: 2,
-    transform: [{ rotate: '-45deg' }],
-  },
-  trayDone: {
-    marginLeft: 'auto',
-    paddingVertical: 4,
-    paddingLeft: 8,
-  },
-  trayDoneText: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

@@ -2,7 +2,7 @@
 export type TaskSize = 's' | 'm' | 'l' | 'xl';
 
 /** Which route line a task sits on — colour as category. */
-export type LineId = 'red' | 'blue' | 'green' | 'orange' | 'purple' | 'yellow' | 'grey';
+export type LineId = 'red' | 'blue' | 'green' | 'orange' | 'purple' | 'baby' | 'yellow' | 'grey';
 
 export interface Task {
   id: string;
@@ -13,6 +13,10 @@ export interface Task {
   difficulty?: 'normal' | 'hard';
   size?: TaskSize;
   line?: LineId;
+  /** Due date as local midnight, in ms. */
+  due?: number;
+  /** A link that belongs with the stop. */
+  url?: string;
   /** Position on the Map canvas, in canvas points. Assigned on first visit. */
   pos?: { x: number; y: number };
   /** Upstream stops: this task comes after these. */

@@ -57,9 +57,6 @@ export default function HomeScreen() {
     uncompleteTask,
     deleteTask,
     restoreTask,
-    editTask,
-    setTaskSize,
-    setTaskLine,
     dropInList,
     clearCompleted,
     replaceTasks,
@@ -171,15 +168,6 @@ export default function HomeScreen() {
   // right, it joins the stack under the original stop — several supporters
   // can hang off the same one.
   const listRef = useRef<FlatList<Task>>(null);
-  const handleBeginEdit = useCallback((index: number) => {
-    requestAnimationFrame(() => {
-      try {
-        listRef.current?.scrollToIndex({ index, viewPosition: 0.22, animated: true });
-      } catch {
-        /* unmeasured row — the keyboard avoider still lifts the composer */
-      }
-    });
-  }, []);
   const drag = useDragState();
   const [heldId, setHeldId] = useState('');
   const handleHold = useCallback((id: string | null) => setHeldId(id ?? ''), []);
@@ -230,11 +218,7 @@ export default function HomeScreen() {
         onStrike={onStrike}
         onComplete={handleComplete}
         onDelete={handleDelete}
-        onEdit={editTask}
-        onSize={setTaskSize}
-        onLine={setTaskLine}
         upstream={upstreamFor(item)}
-        onBeginEdit={handleBeginEdit}
       />
     ),
     [
@@ -242,15 +226,11 @@ export default function HomeScreen() {
       drag,
       handleHold,
       handleDrop,
-      handleBeginEdit,
       settings,
       reduceMotion,
       onStrike,
       handleComplete,
       handleDelete,
-      editTask,
-      setTaskSize,
-      setTaskLine,
       upstreamFor,
     ],
   );

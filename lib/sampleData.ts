@@ -13,6 +13,9 @@ type Seed = {
   after?: number[];
   /** Hours ago it was added (older than today's start = "carried"). */
   ageH?: number;
+  /** Due this many days from today. */
+  dueInDays?: number;
+  url?: string;
   /** Struck this many minutes ago (today). */
   doneMinAgo?: number;
 };
@@ -23,7 +26,14 @@ const SEEDS: Seed[] = [
   { text: 'Call the dentist about the crown', line: 'red', pos: { x: 40, y: 150 }, ageH: 50 },
   { text: 'Book the room for Friday review', line: 'blue', pos: { x: 262, y: 150 }, after: [0] },
   { text: 'Pick up dry cleaning on 7th Ave', size: 's', line: 'orange', pos: { x: 470, y: 40 } },
-  { text: 'Draft the Q4 budget memo', size: 'l', line: 'purple', pos: { x: 30, y: 290 }, ageH: 28 },
+  {
+    text: 'Draft the Q4 budget memo: what we spent, what we are keeping, and the three cuts to make before Thursday',
+    size: 'l',
+    line: 'purple',
+    pos: { x: 30, y: 290 },
+    ageH: 28,
+    dueInDays: 2,
+  },
   { text: 'Send Maya the outline', line: 'blue', pos: { x: 300, y: 300 }, after: [5] },
   { text: 'Water the fig', size: 's', line: 'green', pos: { x: 470, y: 170 } },
   { text: 'Renew passport before the trip', line: 'yellow', pos: { x: 20, y: 430 } },
@@ -31,7 +41,14 @@ const SEEDS: Seed[] = [
   { text: "Plan Dad's birthday dinner", line: 'orange', pos: { x: 410, y: 420 } },
   { text: 'Write the Signal style guide intro', size: 'l', line: 'red', pos: { x: 200, y: 560 }, after: [5, 6] },
   { text: 'Email the accountant about the K-1', line: 'grey', pos: { x: 20, y: 700 }, ageH: 26 },
-  { text: 'Rough cut of the trailer by Sunday', size: 'xl', line: 'purple', pos: { x: 250, y: 700 } },
+  {
+    text: 'Rough cut of the trailer by Sunday — opening, the hydrant blast, and the end card',
+    size: 'xl',
+    line: 'baby',
+    pos: { x: 250, y: 700 },
+    dueInDays: 4,
+    url: 'https://frame.io',
+  },
   { text: 'Order new running shoes', size: 's', line: 'green', pos: { x: 560, y: 690 } },
   { text: 'Prep questions for the Tuesday interview', line: 'blue', pos: { x: 30, y: 840 }, after: [0] },
   { text: 'Cancel the unused streaming sub', size: 's', line: 'grey', pos: { x: 270, y: 850 } },
@@ -60,6 +77,12 @@ export function buildSampleTasks(now = Date.now()): Task[] {
       pos: done ? undefined : s.pos,
       after: s.after?.map((n) => ids[n]),
     };
+    if (s.dueInDays != null) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + s.dueInDays);
+      t.due = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    }
+    if (s.url) t.url = s.url;
     if (done) t.completedAt = now - s.doneMinAgo! * 60_000;
     return t;
   });
