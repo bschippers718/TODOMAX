@@ -99,6 +99,25 @@ function flattenSupporters(open: Task[], parentId: string): Task[] {
   });
 }
 
+/**
+ * How the open list reads with folded stacks: the rows still shown, and how
+ * many steps hang under each original that has any.
+ */
+export function foldStacks(open: Task[]): { visible: Task[]; steps: Map<string, number> } {
+  const steps = new Map<string, number>();
+  const visible: Task[] = [];
+  for (let i = 0; i < open.length; i++) {
+    const original = stackOriginal(open, i);
+    if (original.id === open[i].id) {
+      visible.push(open[i]);
+      continue;
+    }
+    steps.set(original.id, (steps.get(original.id) ?? 0) + 1);
+    if (!original.collapsed) visible.push(open[i]);
+  }
+  return { visible, steps };
+}
+
 function writeOpen(tasks: Task[], open: Task[]): Task[] {
   let k = 0;
   return tasks.map((t) => (t.completed ? t : open[k++]));
@@ -159,4 +178,38 @@ export function applyListDrop(tasks: Task[], id: string, to: number, intent: Lis
   }
   if (from === target) return { tasks, result: { kind: 'moved' } };
   return { tasks: writeOpen(tasks, next), result: { kind: 'moved' } };
+}
+
+/**
+ * A drop in the list as it's shown, folded stacks and all. `to` counts shown
+ * rows. A folded original travels with its steps; landing under a folded
+ * stack lands after its last step, and tucking into one opens it.
+ */
+export function applyShownDrop(tasks: Task[], id: string, to: number, intent: ListDropIntent): { tasks: Task[]; result: ListDropResult } {
+  const open = tasks.filter((t) => !t.completed);
+  const { visible } = foldStacks(open);
+  if (visible.length === open.length) return applyListDrop(tasks, id, to, intent);
+
+  const from = open.findIndex((t) => t.id === id);
+  if (from < 0) return { tasks, result: { kind: 'moved' } };
+  const shown = new Set(visible.map((t) => t.id));
+  let end = from + 1;
+  while (end < open.length && !shown.has(open[end].id)) end++;
+  const block = open.slice(from, end);
+  const rest = [...open.slice(0, from), ...open.slice(end)];
+
+  const others = visible.filter((t) => t.id !== id);
+  const slot = Math.max(0, Math.min(to, others.length));
+  const at = slot < others.length ? rest.findIndex((t) => t.id === others[slot].id) : rest.length;
+  const next = [...rest.slice(0, at), ...block, ...rest.slice(at)];
+  const reordered = writeOpen(tasks, next);
+
+  const { tasks: out, result } = applyListDrop(reordered, id, at, intent);
+  if (result.kind !== 'tucked') return { tasks: out, result };
+  const outOpen = out.filter((t) => !t.completed);
+  const original = stackOriginal(outOpen, outOpen.findIndex((t) => t.id === id));
+  return {
+    tasks: out.map((t) => (t.id === original.id && t.collapsed ? { ...t, collapsed: undefined } : t)),
+    result,
+  };
 }

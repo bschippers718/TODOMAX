@@ -94,7 +94,13 @@ interface TaskItemProps {
   onDelete: (id: string) => void;
   /** Open stops this one comes after (texts), shown as a quiet hint. */
   upstream?: string[];
+  /** Steps tucked under this stop; with any, the card can fold them away. */
+  steps?: number;
+  onToggleSteps?: (id: string) => void;
 }
+
+// The fold control's touch strip at the card's trailing edge.
+const FOLD_HIT = 52;
 
 function TaskItemInner({
   task,
@@ -110,6 +116,8 @@ function TaskItemInner({
   onComplete,
   onDelete,
   upstream,
+  steps = 0,
+  onToggleSteps,
 }: TaskItemProps) {
   const router = useRouter();
   const theme = useTheme();
@@ -203,6 +211,26 @@ function TaskItemInner({
     Keyboard.dismiss();
     router.push(`/task/${task.id}`);
   }, [ghost, router, task.id]);
+
+  // The chevron's own press and the card's tap can both land on one touch.
+  const foldable = steps > 0 && !ghost;
+  const folded = foldable && Boolean(task.collapsed);
+  const toggledAt = useRef(0);
+  const latestFold = useRef(onToggleSteps);
+  latestFold.current = onToggleSteps;
+  const toggleSteps = useCallback(() => {
+    const now = Date.now();
+    if (now - toggledAt.current < 400) return;
+    toggledAt.current = now;
+    latestFold.current?.(task.id);
+  }, [task.id]);
+  const foldTurn = useSharedValue(folded ? 1 : 0);
+  useEffect(() => {
+    foldTurn.value = reduceMotion ? (folded ? 1 : 0) : withTiming(folded ? 1 : 0, { duration: 200 });
+  }, [folded, reduceMotion, foldTurn]);
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${-90 * foldTurn.value}deg` }],
+  }));
 
   // ---- Hold to lift ---------------------------------------------------------
   const latestDrop = useRef({ onHold, onDrop, index });
@@ -508,6 +536,10 @@ function TaskItemInner({
         runOnJS(fireBullet)();
         return;
       }
+      if (foldable && e.x > cardWidth.value - FOLD_HIT) {
+        runOnJS(toggleSteps)();
+        return;
+      }
       runOnJS(openStop)();
     });
 
@@ -651,10 +683,13 @@ function TaskItemInner({
         case 'untuck':
           latestDrop.current.onDrop?.(task.id, index, 'untuck');
           break;
+        case 'toggleSteps':
+          toggleSteps();
+          break;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [openStop, task.id],
+    [openStop, toggleSteps, task.id],
   );
 
   const radius = { borderRadius: theme.radiusCard };
@@ -722,7 +757,9 @@ function TaskItemInner({
           ]}
           accessible
           accessibilityRole="button"
-          accessibilityLabel={task.text}
+          accessibilityLabel={
+            foldable ? `${task.text}, ${steps} step${steps === 1 ? '' : 's'}${folded ? ', folded' : ''}` : task.text
+          }
           accessibilityHint={struck ? undefined : 'Tap to read the whole stop'}
           accessibilityState={{ busy: struck }}
           accessibilityActions={[
@@ -737,6 +774,7 @@ function TaskItemInner({
               : []),
             ...(canDrag && index < count - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
             ...(upstream && upstream.length > 0 ? [{ name: 'untuck', label: 'Untuck' }] : []),
+            ...(foldable ? [{ name: 'toggleSteps', label: folded ? 'Show steps' : 'Hide steps' }] : []),
           ]}
           onAccessibilityAction={onAccessibilityAction}
         >
@@ -801,6 +839,32 @@ function TaskItemInner({
                 </Text>
               )}
             </Animated.View>
+
+            {foldable && !struck && (
+              <Pressable
+                onPress={toggleSteps}
+                hitSlop={12}
+                accessible={false}
+                style={({ pressed }) => [
+                  styles.fold,
+                  {
+                    backgroundColor: painted ? 'rgba(0,0,0,0.14)' : theme.surfaceSoft,
+                    borderRadius: theme.radiusTag,
+                    opacity: pressed ? 0.6 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.foldCount, { color: painted ? onPaint! : theme.textSecondary }]}
+                  allowFontScaling={false}
+                >
+                  {steps}
+                </Text>
+                <Animated.View style={chevronStyle}>
+                  <Symbol name="chevron.down" size={11} color={painted ? onPaint! : theme.textSecondary} weight="bold" />
+                </Animated.View>
+              </Pressable>
+            )}
 
             {inking && (
               <InkTrail points={inkPoints} count={inkCount} opacity={inkOpacity} color={inkColor} square={signal} />
@@ -938,5 +1002,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 3,
+  },
+  fold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginLeft: 4,
+    marginRight: -4,
+  },
+  foldCount: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
 });

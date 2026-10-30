@@ -25,6 +25,7 @@ import { useTheme, loudType } from '../lib/theme';
 import { Task, Settings, openUpstream } from '../lib/types';
 import { animateNextLayout } from '../lib/nativeLayout';
 import { revokeStrike } from '../hooks/useScore';
+import { foldStacks } from '../lib/stack';
 
 const noop = () => {};
 
@@ -60,6 +61,7 @@ export default function HomeScreen() {
     deleteTask,
     restoreTask,
     dropInList,
+    toggleCollapsed,
     clearCompleted,
     replaceTasks,
   } = useTasks();
@@ -175,8 +177,20 @@ export default function HomeScreen() {
   const drag = useDragState();
   const [heldId, setHeldId] = useState('');
   const handleHold = useCallback((id: string | null) => setHeldId(id ?? ''), []);
-  const heldIndex = heldId ? activeTasks.findIndex((t) => t.id === heldId) : -1;
-  const heldTask = heldIndex >= 0 ? activeTasks[heldIndex] : null;
+
+  // A big stop can fold its steps away so the rest of the day scrolls past.
+  const { visible: shownTasks, steps } = useMemo(() => foldStacks(activeTasks), [activeTasks]);
+  const handleToggleSteps = useCallback(
+    (id: string) => {
+      if (settings.hapticsEnabled) Haptics.selectionAsync();
+      animateNextLayout(reduceMotion);
+      toggleCollapsed(id);
+    },
+    [toggleCollapsed, settings.hapticsEnabled, reduceMotion],
+  );
+
+  const heldIndex = heldId ? shownTasks.findIndex((t) => t.id === heldId) : -1;
+  const heldTask = heldIndex >= 0 ? shownTasks[heldIndex] : null;
   const handleDrop = useCallback(
     (id: string, to: number, intent: DropIntent) => {
       const result = dropInList(id, to, intent);
@@ -213,7 +227,7 @@ export default function HomeScreen() {
       <TaskItem
         task={item}
         index={index}
-        count={activeTasks.length}
+        count={shownTasks.length}
         drag={drag}
         onHold={handleHold}
         onDrop={handleDrop}
@@ -223,10 +237,14 @@ export default function HomeScreen() {
         onComplete={handleComplete}
         onDelete={handleDelete}
         upstream={upstreamFor(item)}
+        steps={steps.get(item.id)}
+        onToggleSteps={handleToggleSteps}
       />
     ),
     [
-      activeTasks.length,
+      shownTasks.length,
+      steps,
+      handleToggleSteps,
       drag,
       handleHold,
       handleDrop,
@@ -550,7 +568,7 @@ export default function HomeScreen() {
 
         <FlatList
           ref={listRef}
-          data={activeTasks}
+          data={shownTasks}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}

@@ -21,6 +21,8 @@ export interface Task {
   pos?: { x: number; y: number };
   /** Upstream stops: this task comes after these. */
   after?: string[];
+  /** The steps tucked under this stop are folded away in the list. */
+  collapsed?: boolean;
   /**
    * The mark that struck it, so the struck card shows *your* line. Flat
    * [x, y, w, ...]: x and y as fractions of the card's width and height,

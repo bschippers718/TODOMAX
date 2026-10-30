@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskSize, LineId, generateId } from '../lib/types';
-import { applyListDrop, ListDropIntent, ListDropResult } from '../lib/stack';
+import { applyShownDrop, ListDropIntent, ListDropResult } from '../lib/stack';
 import { loadJSON, saveJSON, KEYS } from '../lib/storage';
 
 /**
@@ -200,11 +200,17 @@ export function reorderTask(id: string, to: number) {
 /**
  * Reorder an open stop and, when tucking, hang it off the original at the
  * top of that stack — along with every other supporter already there.
+ * `to` counts rows as shown, so folded steps don't take a slot.
  */
 export function dropInList(id: string, to: number, intent: ListDropIntent): ListDropResult {
-  const { tasks, result } = applyListDrop(state.tasks, id, to, intent);
+  const { tasks, result } = applyShownDrop(state.tasks, id, to, intent);
   if (tasks !== state.tasks) setTasks(() => tasks);
   return result;
+}
+
+/** Fold or unfold the steps tucked under a stop. */
+export function toggleCollapsed(id: string) {
+  setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, collapsed: t.collapsed ? undefined : true } : t)));
 }
 
 /** `id` now comes after `upstreamId` (list drag: tucked under the stop above). */
@@ -324,6 +330,7 @@ export function useTasks() {
       setTaskLine,
       reorderTask,
       dropInList,
+      toggleCollapsed,
       linkAfter,
       clearAfter,
       moveTask,
